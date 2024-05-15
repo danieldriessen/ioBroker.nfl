@@ -1,0 +1,111 @@
+{
+	"common": {
+		"name": "nfl",
+		"version": "0.0.1",
+		"news": {
+			"0.0.1": {
+				"en": "initial release",
+				"de": "Erstveröffentlichung",
+				"ru": "Начальная версия",
+				"pt": "lançamento inicial",
+				"nl": "Eerste uitgave",
+				"fr": "Première version",
+				"it": "Versione iniziale",
+				"es": "Versión inicial",
+				"pl": "Pierwsze wydanie",
+				"uk": "Початкова версія",
+				"zh-cn": "首次出版"
+			}
+		},
+		"title": "NFL",
+		"titleLang": {
+			"en": "NFL",
+			"de": "NFL",
+			"ru": "НФЛ",
+			"pt": "NFL",
+			"nl": "NFL",
+			"fr": "NFL",
+			"it": "NFL",
+			"es": "NFL",
+			"pl": "NFL",
+			"uk": "НФЛ",
+			"zh-cn": "国家橄榄球联盟"
+		},
+		"desc": {
+			"en": "Get the latest NFL scores and other NFL game information.",
+			"de": "Erhalten Sie die neuesten NFL-Ergebnisse und andere NFL-Spielinformationen.",
+			"ru": "Получите последние результаты НФЛ и другую информацию об играх НФЛ.",
+			"pt": "Obtenha os últimos resultados da NFL e outras informações sobre jogos da NFL.",
+			"nl": "Ontvang de nieuwste NFL-scores en andere NFL-spelinformatie.",
+			"fr": "Obtenez les derniers scores de la NFL et d'autres informations sur les matchs de la NFL.",
+			"it": "Ottieni gli ultimi punteggi NFL e altre informazioni sulle partite NFL.",
+			"es": "Obtenga los últimos resultados de la NFL y otra información sobre juegos de la NFL.",
+			"pl": "Otrzymuj najnowsze wyniki NFL i inne informacje o meczach NFL.",
+			"uk": "Отримайте останні результати НФЛ та іншу інформацію про гру НФЛ.",
+			"zh-cn": "获取最新的 NFL 比分和其他 NFL 比赛信息。"
+		},
+		"authors": ["Daniel Drießen <daniel.driessen@ddproductions.de>"],
+		"keywords": ["nfl", "sport", "football", "scores", "stats"],
+		"license": "MIT",
+		"licenseInformation": {
+			"type": "free",
+			"license": "MIT"
+		},
+		"platform": "Javascript/Node.js",
+		"main": "main.js",
+		"icon": "nfl.png",
+		"enabled": true,
+		"extIcon": "https://raw.githubusercontent.com/danieldriessen/ioBroker.nfl/main/admin/nfl.png",
+		"readme": "https://github.com/danieldriessen/ioBroker.nfl/blob/main/README.md",
+		"loglevel": "info",
+		"tier": 3,
+		"restartAdapters": ["vis"],
+		"mode": "daemon",
+		"type": "misc-data",
+		"compact": true,
+		"connectionType": "cloud",
+		"dataSource": "poll",
+		"adminUI": {
+			"config": "json"
+		},
+		"dependencies": [
+			{
+				"js-controller": ">=3.3.22"
+			},
+			"vis"
+		],
+		"globalDependencies": [
+			{
+				"admin": ">=5.1.13"
+			}
+		]
+	},
+	"native": {
+		"option1": true,
+		"option2": "42"
+	},
+	"objects": [],
+	"instanceObjects": [
+		{
+			"_id": "info",
+			"type": "channel",
+			"common": {
+				"name": "Information"
+			},
+			"native": {}
+		},
+		{
+			"_id": "info.connection",
+			"type": "state",
+			"common": {
+				"role": "indicator.connected",
+				"name": "Device or service connected",
+				"type": "boolean",
+				"read": true,
+				"write": false,
+				"def": false
+			},
+			"native": {}
+		}
+	]
+}
