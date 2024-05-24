@@ -90,6 +90,9 @@ const subpath_nflTeamLogoImages_darkScoreboardLogos = path.join(subpath_nflTeamL
 // Define URLs
 const url_espnAPI_nflTeams = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams";
 
+// Define Timeouts
+const timeout_urlRequests = 5000;
+
 class Nfl extends utils.Adapter {
 	/**
 	 * @param {Partial<utils.AdapterOptions>} [options={}]
@@ -173,7 +176,7 @@ class Nfl extends utils.Adapter {
 
 		try {
 			// Get the content from the NFL-Team information URL
-			const response = await axios.get(url_espnAPI_nflTeams);
+			const response = await axios.get(url_espnAPI_nflTeams, { timeout: timeout_urlRequests });
 			const responseData = response.data;
 
 			// Check if we received a valid response
