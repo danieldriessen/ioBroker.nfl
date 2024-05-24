@@ -310,6 +310,8 @@ class Nfl extends utils.Adapter {
 	 * @todo add documentation for this function
 	 **************************************************************************************************************************************/
 	async store_NFLteams(nflTeams) {
+		this.log.debug(`Storing NFL-Teams...`);
+
 		// Validate received parameter 'nflTeams'
 		try {
 			NFLTeam.validateNFLTeamsArray(nflTeams);
