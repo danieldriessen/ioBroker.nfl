@@ -18,6 +18,9 @@ const path = require("path");
 const NFLTeam = require("./lib/classes/NFLTeam");
 const { NFLTeamLogo, NFLTeamLogoTypes } = require("./lib/classes/NFLTeamLogo");
 
+// Define constants
+const FORBIDDEN_CHARS = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
+
 // Define ioBroker object IDs, names & descriptions
 const ioBrokerObjectID_folder_nflTeams = "nfl-teams";
 const ioBrokerObjectName_folder_nflTeams = "NFL-Teams";
@@ -319,7 +322,7 @@ class Nfl extends utils.Adapter {
 		this.log.debug(`Creating folder for NFL-Teams...`);
 		try {
 			let folderCreationResult = null;
-			folderCreationResult = await this.setObjectNotExistsAsync(ioBrokerObjectID_folder_nflTeams, {
+			folderCreationResult = await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams), {
 				type: "folder",
 				common: {
 					name: ioBrokerObjectName_folder_nflTeams,
@@ -336,7 +339,7 @@ class Nfl extends utils.Adapter {
 				this.log.debug(`Updating the folder for NFL-Teams...`);
 
 				// Fetch the existing object to preserve its current properties
-				const existingObject = await this.getObjectAsync(ioBrokerObjectID_folder_nflTeams);
+				const existingObject = await this.getObjectAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams));
 
 				if (existingObject) {
 					existingObject.common = {
@@ -345,7 +348,7 @@ class Nfl extends utils.Adapter {
 					};
 
 					try {
-						const folderUpdateResult = await this.extendObjectAsync(ioBrokerObjectID_folder_nflTeams, existingObject);
+						const folderUpdateResult = await this.extendObjectAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams), existingObject);
 
 						if (folderUpdateResult) {
 							this.log.debug(`Successfully updated folder for NFL-Teams.`);
@@ -880,6 +883,9 @@ class Nfl extends utils.Adapter {
 		// CREATE OBJECT
 		this.log.silly(`Creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}'...`);
 
+		// Replace forbidden characters in object-id.
+		namespacePath = replaceForbiddenCharactersInObjectID(namespacePath);
+
 		// Validate other parameters
 		if (!(nflTeam instanceof NFLTeam)) {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'nflTeam' is not an instance of 'NFLTeam'!`;
@@ -1121,6 +1127,10 @@ class Nfl extends utils.Adapter {
 	// 		}
 	// 	}
 	// }
+}
+
+function replaceForbiddenCharactersInObjectID(objectID) {
+	return (objectID || "").replace(FORBIDDEN_CHARS, "_");
 }
 
 if (require.main !== module) {
