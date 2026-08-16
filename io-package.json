@@ -46,7 +46,6 @@
 		},
 		"authors": ["Daniel Drießen <daniel.driessen@ddproductions.de>"],
 		"keywords": ["nfl", "sport", "football", "scores", "stats"],
-		"license": "MIT",
 		"licenseInformation": {
 			"type": "free",
 			"license": "MIT"

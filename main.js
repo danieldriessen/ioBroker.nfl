@@ -169,7 +169,7 @@ class Nfl extends utils.Adapter {
 		this.on("message", this.onMessage.bind(this));
 		this.on("unload", this.onUnload.bind(this));
 
-		// Define globale variables
+		// Define global variables
 		this.nflDivisions = [];
 		this.nflTeams = [];
 		this.nflVenues = [];
@@ -589,7 +589,7 @@ class Nfl extends utils.Adapter {
 						try {
 							venueAddress = new NFLVenueAddress(team.franchise.venue.address.city, team.franchise.venue.address.state, team.franchise.venue.address.zipCode);
 						} catch (error) {
-							const warningMessage = `Warning: Unable to create NFLVenueAaddress object for Venue of NFL-Team '${nflTeam.displayName}': ${error.message}`;
+							const warningMessage = `Warning: Unable to create NFLVenueAddress object for Venue of NFL-Team '${nflTeam.displayName}': ${error.message}`;
 							this.log.warn(warningMessage);
 						}
 					} else {
