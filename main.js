@@ -126,6 +126,12 @@ const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES = "Venue 
 // NFL Games (scoreboard) object IDs
 const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES = "nfl-games";
 const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO = "info";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT = "current";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE = "archive";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL = "all";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES = "favorites";
+const IOBROKER_OBJECT_ID__FOLDER__VIEWS = "views";
+const IOBROKER_OBJECT_ID__STATE__LEFT_SLATE_AT = "_leftSlateAt";
 
 // Scoreboard poll settings
 const URL_ESPN_CDN_SCOREBOARD = "https://cdn.espn.com/core/nfl/scoreboard?xhr=1&limit=50";
@@ -696,6 +702,57 @@ class Nfl extends utils.Adapter {
 		return clamped * 1000;
 	}
 
+	/** @returns {number} seasons to keep; 0 = unlimited */
+	_archiveSeasonsToKeep() {
+		const raw = Number(this.config.archiveSeasonsToKeep);
+		if (!Number.isFinite(raw) || raw < 0) {
+			return 2;
+		}
+		return Math.min(20, Math.floor(raw));
+	}
+
+	/** @returns {number} */
+	_currentPostGameLingerHours() {
+		const raw = Number(this.config.currentPostGameLingerHours);
+		if (!Number.isFinite(raw) || raw < 0) {
+			return 12;
+		}
+		return Math.min(168, raw);
+	}
+
+	/** @returns {number} */
+	_focusPostGameLingerHours() {
+		const raw = Number(this.config.focusPostGameLingerHours);
+		if (!Number.isFinite(raw) || raw < 0) {
+			return 24;
+		}
+		return Math.min(168, raw);
+	}
+
+	/** @returns {number} */
+	_viewsTodayMaxSlots() {
+		const raw = Number(this.config.viewsTodayMaxSlots);
+		if (!Number.isFinite(raw)) {
+			return 16;
+		}
+		return Math.min(32, Math.max(1, Math.floor(raw)));
+	}
+
+	/** @returns {boolean} */
+	_writeViewJson() {
+		return this.config.writeViewJson !== false;
+	}
+
+	/** @returns {boolean} */
+	_archiveAllGamesEnabled() {
+		return this.config.archiveAllGames !== false;
+	}
+
+	/** @returns {boolean} */
+	_archiveFavoriteGamesEnabled() {
+		return this.config.archiveFavoriteGames !== false;
+	}
+
 	/**
 	 * Kicks off the first scoreboard fetch and schedules subsequent ones.
 	 * Uses a recursive setTimeout so polls never overlap.
@@ -720,7 +777,239 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
-	 * Fetches the ESPN CDN scoreboard, writes game objects under `nfl-games.*`.
+	 * Normalizes one ESPN scoreboard event into a compact game DTO.
+	 * @param {object} ev
+	 * @param {number|null} seasonYear
+	 * @param {number|null} weekNumber
+	 * @param {Set<string>} favoriteTeamIds
+	 */
+	_normalizeScoreboardEvent(ev, seasonYear, weekNumber, favoriteTeamIds) {
+		const eventId = String(ev.id || "");
+		const comp = (ev.competitions || [])[0] || {};
+		const statusObj = comp.status || {};
+		const statusType = statusObj.type || {};
+		const competitors = comp.competitors || [];
+		/** @type {Record<string, object>} */
+		const sides = {};
+		for (const side of ["home", "away"]) {
+			const c = competitors.find((x) => x.homeAway === side) || {};
+			const team = c.team || {};
+			const teamId = String(team.id ?? "");
+			sides[side] = {
+				teamId,
+				abbreviation: team.abbreviation ?? "",
+				displayName: team.displayName ?? "",
+				score: c.score ?? "",
+				winner: !!c.winner,
+				isFavorite: favoriteTeamIds.has(teamId),
+			};
+		}
+		return {
+			id: eventId,
+			name: ev.name ?? "",
+			shortName: ev.shortName ?? "",
+			date: ev.date ?? "",
+			seasonYear: seasonYear,
+			week: weekNumber,
+			status: {
+				state: statusType.state ?? "",
+				name: statusType.name ?? "",
+				detail: statusType.detail ?? "",
+				shortDetail: statusType.shortDetail ?? "",
+				period: statusObj.period ?? 0,
+				displayClock: statusObj.displayClock ?? "",
+				completed: !!statusType.completed,
+			},
+			home: sides.home,
+			away: sides.away,
+		};
+	}
+
+	/**
+	 * Compact DTO for JSON view mirrors.
+	 * @param {object} game
+	 * @param {string} objectPath relative or absolute path hint
+	 */
+	_gameToViewJson(game, objectPath) {
+		return {
+			id: game.id,
+			name: game.name,
+			shortName: game.shortName,
+			date: game.date,
+			seasonYear: game.seasonYear,
+			week: game.week,
+			status: game.status?.state ?? "",
+			clock: game.status?.displayClock ?? "",
+			period: game.status?.period ?? 0,
+			detail: game.status?.detail ?? "",
+			completed: !!game.status?.completed,
+			phase: game.phase || undefined,
+			home: {
+				id: game.home?.teamId ?? "",
+				abbr: game.home?.abbreviation ?? "",
+				name: game.home?.displayName ?? "",
+				score: game.home?.score ?? "",
+				winner: !!game.home?.winner,
+				isFavorite: !!game.home?.isFavorite,
+			},
+			away: {
+				id: game.away?.teamId ?? "",
+				abbr: game.away?.abbreviation ?? "",
+				name: game.away?.displayName ?? "",
+				score: game.away?.score ?? "",
+				winner: !!game.away?.winner,
+				isFavorite: !!game.away?.isFavorite,
+			},
+			path: objectPath,
+		};
+	}
+
+	/**
+	 * Writes a full game channel tree under `basePath` (without namespace).
+	 * @param {string} basePath e.g. nfl-games.current.401…
+	 * @param {object} game normalized game
+	 * @param {{includePhase?: boolean, phase?: string, clearLeftSlate?: boolean}} [opts]
+	 */
+	async _writeGameChannel(basePath, game, opts = {}) {
+		const name = game.name || game.shortName || game.id || "Game";
+		await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(basePath), {
+			type: "channel",
+			common: { name },
+			native: {},
+		});
+
+		await this._setSimpleState(`${basePath}.name`, "Name", "string", "value", game.name ?? "");
+		await this._setSimpleState(`${basePath}.shortName`, "Short name", "string", "value", game.shortName ?? "");
+		await this._setSimpleState(`${basePath}.date`, "Kickoff (UTC)", "string", "value.time", game.date ?? "");
+		await this._setSimpleState(`${basePath}.seasonYear`, "Season year", "number", "value", game.seasonYear ?? 0);
+		await this._setSimpleState(`${basePath}.week`, "Week", "number", "value", game.week ?? 0);
+		await this._setSimpleState(`${basePath}.eventId`, "ESPN event ID", "string", "value", game.id ?? "");
+		await this._setSimpleState(`${basePath}.headline`, "Headline", "string", "text", game.shortName || game.name || "");
+
+		if (opts.includePhase) {
+			await this._setSimpleState(`${basePath}.phase`, "View phase", "string", "value", opts.phase || game.phase || "idle");
+		}
+
+		const statusPath = `${basePath}.status`;
+		await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(statusPath), {
+			type: "channel",
+			common: { name: "Status" },
+			native: {},
+		});
+		const st = game.status || {};
+		await this._setSimpleState(`${statusPath}.state`, "State", "string", "value", st.state ?? "");
+		await this._setSimpleState(`${statusPath}.name`, "Status name", "string", "value", st.name ?? "");
+		await this._setSimpleState(`${statusPath}.detail`, "Detail", "string", "value", st.detail ?? "");
+		await this._setSimpleState(`${statusPath}.shortDetail`, "Short detail", "string", "value", st.shortDetail ?? "");
+		await this._setSimpleState(`${statusPath}.period`, "Period", "number", "value", st.period ?? 0);
+		await this._setSimpleState(`${statusPath}.displayClock`, "Clock", "string", "value", st.displayClock ?? "");
+		await this._setSimpleState(`${statusPath}.completed`, "Completed", "boolean", "indicator", !!st.completed);
+
+		for (const side of ["home", "away"]) {
+			const c = game[side] || {};
+			const sidePath = `${basePath}.${side}`;
+			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(sidePath), {
+				type: "channel",
+				common: { name: side === "home" ? "Home team" : "Away team" },
+				native: {},
+			});
+			await this._setSimpleState(`${sidePath}.teamId`, "ESPN team ID", "string", "value", c.teamId ?? "");
+			await this._setSimpleState(`${sidePath}.abbreviation`, "Abbreviation", "string", "value", c.abbreviation ?? "");
+			await this._setSimpleState(`${sidePath}.displayName`, "Display name", "string", "value", c.displayName ?? "");
+			await this._setSimpleState(`${sidePath}.score`, "Score", "string", "value", c.score ?? "");
+			await this._setSimpleState(`${sidePath}.winner`, "Winner", "boolean", "indicator", !!c.winner);
+			await this._setSimpleState(`${sidePath}.isFavorite`, "Is favorite?", "boolean", "indicator", !!c.isFavorite);
+		}
+
+		if (opts.clearLeftSlate) {
+			const leftId = replaceForbiddenCharactersInObjectID(`${basePath}.${IOBROKER_OBJECT_ID__STATE__LEFT_SLATE_AT}`);
+			try {
+				await this.delObjectAsync(leftId);
+			} catch (_e) {
+				// ignore
+			}
+		}
+	}
+
+	/**
+	 * Empty / idle game DTO for unused view slots.
+	 * @returns {object}
+	 */
+	_idleGameDto() {
+		return {
+			id: "",
+			name: "",
+			shortName: "",
+			date: "",
+			seasonYear: 0,
+			week: 0,
+			phase: "idle",
+			status: {
+				state: "",
+				name: "",
+				detail: "",
+				shortDetail: "",
+				period: 0,
+				displayClock: "",
+				completed: false,
+			},
+			home: { teamId: "", abbreviation: "", displayName: "", score: "", winner: false, isFavorite: false },
+			away: { teamId: "", abbreviation: "", displayName: "", score: "", winner: false, isFavorite: false },
+		};
+	}
+
+	/**
+	 * Reads a normalized game DTO back from an existing channel (best-effort).
+	 * @param {string} basePath
+	 * @returns {Promise<object|null>}
+	 */
+	async _readGameChannel(basePath) {
+		const get = async (rel) => {
+			const st = await this.getStateAsync(replaceForbiddenCharactersInObjectID(`${basePath}.${rel}`));
+			return st ? st.val : null;
+		};
+		const id = await get("eventId");
+		const name = await get("name");
+		if (id == null && name == null) {
+			return null;
+		}
+		return {
+			id: String(id || ""),
+			name: String(name || ""),
+			shortName: String((await get("shortName")) || ""),
+			date: String((await get("date")) || ""),
+			seasonYear: Number((await get("seasonYear")) || 0),
+			week: Number((await get("week")) || 0),
+			status: {
+				state: String((await get("status.state")) || ""),
+				name: String((await get("status.name")) || ""),
+				detail: String((await get("status.detail")) || ""),
+				shortDetail: String((await get("status.shortDetail")) || ""),
+				period: Number((await get("status.period")) || 0),
+				displayClock: String((await get("status.displayClock")) || ""),
+				completed: !!(await get("status.completed")),
+			},
+			home: {
+				teamId: String((await get("home.teamId")) || ""),
+				abbreviation: String((await get("home.abbreviation")) || ""),
+				displayName: String((await get("home.displayName")) || ""),
+				score: String((await get("home.score")) ?? ""),
+				winner: !!(await get("home.winner")),
+				isFavorite: !!(await get("home.isFavorite")),
+			},
+			away: {
+				teamId: String((await get("away.teamId")) || ""),
+				abbreviation: String((await get("away.abbreviation")) || ""),
+				displayName: String((await get("away.displayName")) || ""),
+				score: String((await get("away.score")) ?? ""),
+				winner: !!(await get("away.winner")),
+				isFavorite: !!(await get("away.isFavorite")),
+			},
+		};
+	}
+
+	/**
+	 * Fetches the ESPN CDN scoreboard, writes `nfl-games.current.*`, archives, and views.
 	 * @returns {Promise<boolean>} true if at least one game is currently live
 	 */
 	async fetchAndStoreScoreboard() {
@@ -738,14 +1027,25 @@ class Nfl extends utils.Adapter {
 		const weekNumber = sbData.week?.number ?? null;
 		const favoriteTeamIds = this._getFavoriteTeamIds();
 
-		// Ensure nfl-games folder
 		await this.setObjectNotExistsAsync(IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES, {
 			type: "folder",
 			common: { name: "NFL Games" },
 			native: {},
 		});
+		await this.setObjectNotExistsAsync(
+			`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}`,
+			{ type: "folder", common: { name: "Current scoreboard" }, native: {} },
+		);
+		await this.setObjectNotExistsAsync(
+			`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}`,
+			{ type: "folder", common: { name: "Archive" }, native: {} },
+		);
+		await this.setObjectNotExistsAsync(IOBROKER_OBJECT_ID__FOLDER__VIEWS, {
+			type: "folder",
+			common: { name: "DIY views (stable)" },
+			native: {},
+		});
 
-		// Write info channel
 		const infoPath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO}`;
 		await this.setObjectNotExistsAsync(infoPath, {
 			type: "channel",
@@ -753,108 +1053,178 @@ class Nfl extends utils.Adapter {
 			native: {},
 		});
 
+		/** @type {object[]} */
+		const games = [];
 		let liveCount = 0;
 		for (const ev of events) {
-			const comp = (ev.competitions || [])[0] || {};
-			const statusType = (comp.status || {}).type || {};
-			if (statusType.state === "in") {
+			if (!ev?.id) {
+				continue;
+			}
+			const game = this._normalizeScoreboardEvent(ev, seasonYear, weekNumber, favoriteTeamIds);
+			games.path = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}.${game.id}`;
+			games.push(game);
+			if (game.status.state === "in") {
 				liveCount++;
 			}
 		}
 
 		const now = new Date().toISOString();
+		const eventIdList = games.map((g) => g.id);
 		await this._setSimpleState(`${infoPath}.lastUpdate`, "Last update", "string", "value", now);
 		await this._setSimpleState(`${infoPath}.liveGameCount`, "Live game count", "number", "value", liveCount);
-		await this._setSimpleState(`${infoPath}.eventCount`, "Event count", "number", "value", events.length);
+		await this._setSimpleState(`${infoPath}.eventCount`, "Event count", "number", "value", games.length);
 		await this._setSimpleState(`${infoPath}.seasonYear`, "Season year", "number", "value", seasonYear);
 		await this._setSimpleState(`${infoPath}.week`, "Week", "number", "value", weekNumber);
-
 		const nextPollS = liveCount > 0 ? this._livePollIntervalMs() / 1000 : SCOREBOARD_POLL_INTERVAL_IDLE_MS / 1000;
 		await this._setSimpleState(`${infoPath}.nextPollSeconds`, "Next poll in (s)", "number", "value", nextPollS);
-		const eventIdList = events.map((e) => e.id).filter(Boolean);
-		await this._setSimpleState(`${infoPath}.eventIds`, "Event IDs (JSON)", "string", "value.json", JSON.stringify(eventIdList));
+		const idsJson = JSON.stringify(eventIdList);
+		await this._setSimpleState(`${infoPath}.currentEventIds`, "Current event IDs (JSON)", "string", "value.json", idsJson);
+		await this._setSimpleState(`${infoPath}.eventIds`, "Event IDs (JSON, alias)", "string", "value.json", idsJson);
 
-		// Write per-game objects
-		for (const ev of events) {
-			const eventId = ev.id;
-			if (!eventId) {
-				continue;
-			}
-			const eventPath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${eventId}`;
-
-			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(eventPath), {
-				type: "channel",
-				common: { name: ev.name || ev.shortName || eventId },
-				native: {},
-			});
-
-			await this._setSimpleState(`${eventPath}.name`, "Name", "string", "value", ev.name ?? "");
-			await this._setSimpleState(`${eventPath}.shortName`, "Short name", "string", "value", ev.shortName ?? "");
-			await this._setSimpleState(`${eventPath}.date`, "Kickoff (UTC)", "string", "value.time", ev.date ?? "");
-
-			const comp = (ev.competitions || [])[0] || {};
-			const statusObj = comp.status || {};
-			const statusType = statusObj.type || {};
-
-			const statusPath = `${eventPath}.status`;
-			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(statusPath), {
-				type: "channel",
-				common: { name: "Status" },
-				native: {},
-			});
-			await this._setSimpleState(`${statusPath}.state`, "State", "string", "value", statusType.state ?? "");
-			await this._setSimpleState(`${statusPath}.name`, "Status name", "string", "value", statusType.name ?? "");
-			await this._setSimpleState(`${statusPath}.detail`, "Detail", "string", "value", statusType.detail ?? "");
-			await this._setSimpleState(`${statusPath}.shortDetail`, "Short detail", "string", "value", statusType.shortDetail ?? "");
-			await this._setSimpleState(`${statusPath}.period`, "Period", "number", "value", statusObj.period ?? 0);
-			await this._setSimpleState(`${statusPath}.displayClock`, "Clock", "string", "value", statusObj.displayClock ?? "");
-			await this._setSimpleState(`${statusPath}.completed`, "Completed", "boolean", "indicator", statusType.completed ?? false);
-
-			// Competitors
-			const competitors = comp.competitors || [];
-			for (const side of ["home", "away"]) {
-				const c = competitors.find((x) => x.homeAway === side) || {};
-				const team = c.team || {};
-				const sidePath = `${eventPath}.${side}`;
-				await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(sidePath), {
-					type: "channel",
-					common: { name: side === "home" ? "Home team" : "Away team" },
-					native: {},
-				});
-				await this._setSimpleState(`${sidePath}.teamId`, "ESPN team ID", "string", "value", team.id ?? "");
-				await this._setSimpleState(`${sidePath}.abbreviation`, "Abbreviation", "string", "value", team.abbreviation ?? "");
-				await this._setSimpleState(`${sidePath}.displayName`, "Display name", "string", "value", team.displayName ?? "");
-				await this._setSimpleState(`${sidePath}.score`, "Score", "string", "value", c.score ?? "");
-				await this._setSimpleState(`${sidePath}.winner`, "Winner", "boolean", "indicator", c.winner ?? false);
-				await this._setSimpleState(`${sidePath}.isFavorite`, "Is favorite?", "boolean", "indicator", favoriteTeamIds.has(String(team.id ?? "")));
-			}
+		for (const game of games) {
+			const eventPath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}.${game.id}`;
+			await this._writeGameChannel(eventPath, game, { clearLeftSlate: true });
 		}
 
-		// Drop event channels that are no longer on the current scoreboard slate
 		if (eventIdList.length > 0) {
-			await this._pruneStaleGameObjects(eventIdList);
+			await this._archiveOffSlateCurrentGames(new Set(eventIdList));
 		}
 
-		this.log.debug(`Scoreboard stored: ${events.length} events, ${liveCount} live.`);
+		await this._deleteLegacyFlatGameFolders();
+		await this._enforceArchiveSeasonRetention(seasonYear);
+		await this._updateDiyViews(games, favoriteTeamIds);
+
+		this.log.debug(`Scoreboard stored: ${games.length} current events, ${liveCount} live.`);
 		return liveCount > 0;
 	}
 
 	/**
-	 * Deletes `nfl-games.{eventId}` trees whose ESPN event id is not in the current scoreboard.
-	 * Keeps the `info` channel. Skips pruning if the current slate is empty (safety).
-	 * @param {Array<string|number>} currentEventIds
+	 * Moves current games that left the slate (after linger) into archive folders.
+	 * @param {Set<string>} keepIds
 	 */
-	async _pruneStaleGameObjects(currentEventIds) {
-		const keep = new Set(currentEventIds.map(String));
-		const folderPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.`;
+	async _archiveOffSlateCurrentGames(keepIds) {
+		const currentPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}.`;
 		/** @type {Set<string>} */
-		const staleEventIds = new Set();
+		const candidates = new Set();
 
 		let objects;
 		try {
 			objects = await this.getAdapterObjectsAsync();
 		} catch (error) {
-			this.log.warn(`Could not list adapter objects for game cleanup: ${error.message}`);
+			this.log.warn(`Could not list objects for archive move: ${error.message}`);
+			return;
+		}
+
+		for (const fullId of Object.keys(objects || {})) {
+			if (!fullId.startsWith(currentPrefix)) {
+				continue;
+			}
+			const rest = fullId.slice(currentPrefix.length);
+			const eventId = rest.split(".")[0];
+			if (eventId && /^\d+$/.test(eventId) && !keepIds.has(eventId)) {
+				candidates.add(eventId);
+			}
+		}
+
+		if (!candidates.size) {
+			return;
+		}
+
+		const lingerMs = this._currentPostGameLingerHours() * 3600 * 1000;
+		const now = Date.now();
+
+		for (const eventId of candidates) {
+			const basePath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}.${eventId}`;
+			const leftStateId = `${basePath}.${IOBROKER_OBJECT_ID__STATE__LEFT_SLATE_AT}`;
+			let leftAt = null;
+			try {
+				const st = await this.getStateAsync(replaceForbiddenCharactersInObjectID(leftStateId));
+				if (st && st.val) {
+					leftAt = Date.parse(String(st.val));
+				}
+			} catch (_e) {
+				// ignore
+			}
+			if (!leftAt || Number.isNaN(leftAt)) {
+				const iso = new Date().toISOString();
+				await this._setSimpleState(leftStateId, "Left scoreboard slate at", "string", "value.time", iso);
+				if (lingerMs > 0) {
+					this.log.debug(`Game ${eventId} left slate; linger ${this._currentPostGameLingerHours()}h before archive.`);
+					continue;
+				}
+				leftAt = now;
+			}
+
+			if (lingerMs > 0 && now - leftAt < lingerMs) {
+				continue;
+			}
+
+			const game = await this._readGameChannel(basePath);
+			if (!game || !game.id) {
+				try {
+					await this.delObjectAsync(basePath, { recursive: true });
+				} catch (_e) {
+					// ignore
+				}
+				continue;
+			}
+
+			const season = String(game.seasonYear || "unknown");
+			const isFav = !!(game.home?.isFavorite || game.away?.isFavorite);
+
+			if (this._archiveAllGamesEnabled()) {
+				const dest = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL}.${season}.${eventId}`;
+				await this.setObjectNotExistsAsync(
+					`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL}`,
+					{ type: "folder", common: { name: "All archived games" }, native: {} },
+				);
+				await this.setObjectNotExistsAsync(
+					`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL}.${season}`,
+					{ type: "folder", common: { name: `Season ${season}` }, native: {} },
+				);
+				await this._writeGameChannel(dest, game);
+			}
+
+			if (isFav && this._archiveFavoriteGamesEnabled()) {
+				const dest = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES}.${season}.${eventId}`;
+				await this.setObjectNotExistsAsync(
+					`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES}`,
+					{ type: "folder", common: { name: "Favorite-team archived games" }, native: {} },
+				);
+				await this.setObjectNotExistsAsync(
+					`${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES}.${season}`,
+					{ type: "folder", common: { name: `Season ${season}` }, native: {} },
+				);
+				await this._writeGameChannel(dest, game);
+			}
+
+			try {
+				await this.delObjectAsync(basePath, { recursive: true });
+				this.log.info(`Archived game ${eventId} (season ${season}${isFav ? ", favorite" : ""}).`);
+			} catch (error) {
+				this.log.warn(`Failed to remove current game ${eventId} after archive: ${error.message}`);
+			}
+		}
+	}
+
+	/**
+	 * Deletes legacy flat `nfl-games.{eventId}` channels from before the current/ layout.
+	 */
+	async _deleteLegacyFlatGameFolders() {
+		const folderPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.`;
+		const reserved = new Set([
+			IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO,
+			IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT,
+			IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE,
+		]);
+		/** @type {Set<string>} */
+		const legacyIds = new Set();
+
+		let objects;
+		try {
+			objects = await this.getAdapterObjectsAsync();
+		} catch (error) {
+			this.log.warn(`Could not list objects for legacy game cleanup: ${error.message}`);
 			return;
 		}
 
@@ -863,27 +1233,240 @@ class Nfl extends utils.Adapter {
 				continue;
 			}
 			const rest = fullId.slice(folderPrefix.length);
-			const eventId = rest.split(".")[0];
-			if (!eventId || eventId === IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO) {
+			const top = rest.split(".")[0];
+			if (!top || reserved.has(top)) {
 				continue;
 			}
-			if (!keep.has(eventId)) {
-				staleEventIds.add(eventId);
+			if (/^\d+$/.test(top)) {
+				legacyIds.add(top);
 			}
 		}
 
-		if (!staleEventIds.size) {
-			return;
-		}
-
-		this.log.info(`Removing ${staleEventIds.size} stale nfl-games event folder(s) no longer on the scoreboard.`);
-		for (const eventId of staleEventIds) {
+		for (const eventId of legacyIds) {
 			const relativeId = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${eventId}`;
 			try {
 				await this.delObjectAsync(relativeId, { recursive: true });
+				this.log.info(`Removed legacy flat game folder ${relativeId}.`);
 			} catch (error) {
-				this.log.warn(`Failed to delete stale game object '${relativeId}': ${error.message}`);
+				this.log.warn(`Failed to delete legacy game folder '${relativeId}': ${error.message}`);
 			}
+		}
+	}
+
+	/**
+	 * Drops archive season folders older than configured retention (0 = unlimited).
+	 * @param {number|null} currentSeasonYear
+	 */
+	async _enforceArchiveSeasonRetention(currentSeasonYear) {
+		const keepN = this._archiveSeasonsToKeep();
+		if (keepN === 0) {
+			return;
+		}
+		const currentY = Number(currentSeasonYear) || new Date().getFullYear();
+		const minKeep = currentY - keepN + 1;
+
+		for (const branch of [
+			IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL,
+			IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES,
+		]) {
+			const branchPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${branch}.`;
+			/** @type {Set<string>} */
+			const seasons = new Set();
+			let objects;
+			try {
+				objects = await this.getAdapterObjectsAsync();
+			} catch (_e) {
+				return;
+			}
+			for (const fullId of Object.keys(objects || {})) {
+				if (!fullId.startsWith(branchPrefix)) {
+					continue;
+				}
+				const season = fullId.slice(branchPrefix.length).split(".")[0];
+				if (season && /^\d+$/.test(season)) {
+					seasons.add(season);
+				}
+			}
+			for (const season of seasons) {
+				if (Number(season) < minKeep) {
+					const rel = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE}.${branch}.${season}`;
+					try {
+						await this.delObjectAsync(rel, { recursive: true });
+						this.log.info(`Removed archived season ${branch}/${season} (retention ${keepN}).`);
+					} catch (error) {
+						this.log.warn(`Failed to prune archive season ${rel}: ${error.message}`);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Local calendar YYYY-MM-DD for "today" filtering.
+	 * @param {string} iso
+	 * @returns {string}
+	 */
+	_localDateKey(iso) {
+		if (!iso) {
+			return "";
+		}
+		const d = new Date(iso);
+		if (Number.isNaN(d.getTime())) {
+			return "";
+		}
+		const y = d.getFullYear();
+		const m = String(d.getMonth() + 1).padStart(2, "0");
+		const day = String(d.getDate()).padStart(2, "0");
+		return `${y}-${m}-${day}`;
+	}
+
+	/**
+	 * Updates stable DIY view slots, byTeam.focus, and optional JSON mirrors.
+	 * @param {object[]} games
+	 * @param {Set<string>} favoriteTeamIds
+	 */
+	async _updateDiyViews(games, favoriteTeamIds) {
+		const maxSlots = this._viewsTodayMaxSlots();
+		const todayKey = this._localDateKey(new Date().toISOString());
+		const sorted = games.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+		const todayGames = sorted.filter((g) => this._localDateKey(g.date) === todayKey);
+		const liveGames = sorted.filter((g) => g.status.state === "in");
+		const favToday = todayGames.filter((g) => g.home?.isFavorite || g.away?.isFavorite);
+		const favCurrent = sorted.filter((g) => g.home?.isFavorite || g.away?.isFavorite);
+
+		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.today`, "Today's games", todayGames, maxSlots);
+		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.live`, "Live games", liveGames, maxSlots);
+		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites`, {
+			type: "folder",
+			common: { name: "Favorite views" },
+			native: {},
+		});
+		await this._writeViewSlotFolder(
+			`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.today`,
+			"Favorite games today",
+			favToday,
+			maxSlots,
+		);
+
+		if (this._writeViewJson()) {
+			await this._setSimpleState(
+				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.today.scoreboard`,
+				"Today scoreboard (JSON)",
+				"string",
+				"value.json",
+				JSON.stringify(todayGames.map((g) => this._gameToViewJson(g, g.path))),
+			);
+			await this._setSimpleState(
+				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.live.list`,
+				"Live games (JSON)",
+				"string",
+				"value.json",
+				JSON.stringify(liveGames.map((g) => this._gameToViewJson(g, g.path))),
+			);
+			await this._setSimpleState(
+				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.current`,
+				"Favorite games current slate (JSON)",
+				"string",
+				"value.json",
+				JSON.stringify(favCurrent.map((g) => this._gameToViewJson(g, g.path))),
+			);
+
+			const nextFav = favCurrent
+				.filter((g) => g.status.state === "pre")
+				.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+			const lastFav = favCurrent
+				.filter((g) => g.status.state === "post")
+				.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+			await this._setSimpleState(
+				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.next`,
+				"Next favorite game (JSON)",
+				"string",
+				"value.json",
+				JSON.stringify(nextFav ? this._gameToViewJson(nextFav, nextFav.path) : null),
+			);
+			await this._setSimpleState(
+				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.last`,
+				"Last favorite game (JSON)",
+				"string",
+				"value.json",
+				JSON.stringify(lastFav ? this._gameToViewJson(lastFav, lastFav.path) : null),
+			);
+		}
+
+		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam`, {
+			type: "folder",
+			common: { name: "Per-team focus views" },
+			native: {},
+		});
+
+		const focusLingerMs = this._focusPostGameLingerHours() * 3600 * 1000;
+		const now = Date.now();
+
+		for (const teamId of favoriteTeamIds) {
+			const involving = sorted.filter((g) => g.home?.teamId === teamId || g.away?.teamId === teamId);
+			let chosen = null;
+			let phase = "idle";
+
+			const live = involving.find((g) => g.status.state === "in");
+			if (live) {
+				chosen = live;
+				phase = "live";
+			} else {
+				const finals = involving
+					.filter((g) => g.status.state === "post" || g.status.completed)
+					.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+				const finalG = finals[0];
+				if (finalG) {
+					const endApprox = Date.parse(finalG.date) + 4 * 3600 * 1000;
+					const anchor = Number.isNaN(endApprox) ? now : endApprox;
+					if (focusLingerMs === 0 || now - anchor <= focusLingerMs) {
+						chosen = finalG;
+						phase = "final";
+					}
+				}
+				if (!chosen) {
+					const next = involving
+						.filter((g) => g.status.state === "pre")
+						.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+					if (next) {
+						chosen = next;
+						phase = "upcoming";
+					}
+				}
+			}
+
+			const focusPath = `${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}.focus`;
+			await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}`, {
+				type: "folder",
+				common: { name: `Team ${teamId}` },
+				native: {},
+			});
+			const dto = chosen ? { ...chosen, phase } : this._idleGameDto();
+			dto.phase = phase;
+			await this._writeGameChannel(focusPath, dto, { includePhase: true, phase });
+		}
+	}
+
+	/**
+	 * Writes numbered flat view slots under a folder.
+	 * @param {string} folderPath
+	 * @param {string} folderName
+	 * @param {object[]} games
+	 * @param {number} maxSlots
+	 */
+	async _writeViewSlotFolder(folderPath, folderName, games, maxSlots) {
+		await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(folderPath), {
+			type: "folder",
+			common: { name: folderName },
+			native: {},
+		});
+		for (let i = 0; i < maxSlots; i++) {
+			const game = games[i] || this._idleGameDto();
+			const phase =
+				game.phase ||
+				(game.status?.state === "in" ? "live" : game.status?.state === "post" ? "final" : game.status?.state === "pre" ? "upcoming" : "idle");
+			await this._writeGameChannel(`${folderPath}.${i}`, { ...game, phase }, { includePhase: true, phase });
 		}
 	}
 

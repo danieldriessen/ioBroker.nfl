@@ -21,7 +21,9 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Download and store selected team logo variants in the adapter file store
 * Create an ioBroker object tree under `nfl-teams.{espnTeamId}.*` (team info, colors, logos; slug is a state, not the folder key)
 * Enrich teams with division and venue data (including venue images) where available
-* Periodic scoreboard polling (ESPN CDN) writing `nfl-games.{eventId}.*` states: live scores, game clock, status, home/away teams; stale event folders from previous weeks are removed automatically
+* Periodic scoreboard polling (ESPN CDN) writing `nfl-games.current.{eventId}.*` (live scores, clock, status, home/away)
+* Season archive under `nfl-games.archive/all|{favorites}/{seasonYear}/…` with configurable retention (N seasons or unlimited)
+* Stable DIY datapoints under `views.*` (flat slots + optional JSON mirrors; `views.byTeam.{id}.focus` for favorite cards)
 * Configurable live refresh interval (admin, default 30 s; auto 5 min when no games are live)
 * Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
 * **VIS-1 widget — NFL Scoreboard** (`tplNflScoreboard`): live/upcoming/all modes, favorite-filter, team logos (ESPN CDN), animated live indicator, dark-theme; auto-refreshes every 31 s
@@ -29,7 +31,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 
 ### Not implemented yet
 
-* Multi-week schedule endpoint (Scoreboard shows current week only)
+* Multi-week schedule endpoint / `schedule/` tree (Scoreboard + `current/` show the ESPN week slate only)
 * VIS-2 widgets (optional future add-on)
 
 ## Requirements
@@ -37,14 +39,30 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Node.js `>= 18` (see `package.json` `engines`)
 * js-controller `>= 5.0.19`
 * admin `>= 6.17.13`
-* Optional: `vis` (listed for future widgets; not required for team data)
+* Optional: `vis` (VIS-1 widgets included; not required for object data alone)
 
 ## Configuration
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| **Favorite teams** | _(none)_ | any | Dropdown loads the current team list from the running adapter each time you open it (`selectSendTo` / `getTeams`). Select favorites, then use **Save** in the admin toolbar. Writes `isFavorite` on team objects and per-game home/away states. |
-| **Live scoreboard refresh interval (s)** | `30` | 15–300 | How often to poll the ESPN CDN scoreboard while games are in progress. Automatically slows to 5 min when no game is live. |
+| **Favorite teams** | _(none)_ | any | Dropdown loads the current team list from the running adapter each time you open it. Select favorites, then use **Save**. |
+| **Live scoreboard refresh interval (s)** | `30` | 15–300 | Poll interval while games are live; 5 min when idle. |
+| **Seasons to keep in archive** | `2` | 0–20 | Last N ESPN season years under `archive/`. **`0` = unlimited**. |
+| **Archive all / favorite games** | on / on | — | Store completed games under `archive/all` and/or `archive/favorites`. |
+| **Keep finished games in current (h)** | `12` | 0–168 | Linger in `nfl-games.current` after leaving the slate before archive. |
+| **Favorite focus: show final (h)** | `24` | 0–168 | How long `views.byTeam.{id}.focus` stays on `final` before next upcoming. |
+| **Max today/live view slots** | `16` | 1–32 | Flat slots `views.today.N` / `views.live.N` for DIY VIS bindings. |
+| **Also write JSON view mirrors** | on | — | Extra JSON states for scripts; flat states are always written. |
+
+### Object paths for DIY VIS
+
+Prefer stable views (paths do not move when a game is archived):
+
+* `nfl.0.views.byTeam.{espnTeamId}.focus.*` — upcoming / live / final for one team  
+* `nfl.0.views.today.0` … — today's games as numbered slots  
+* `nfl.0.views.live.0` … — live games only  
+
+Canonical week data: `nfl.0.nfl-games.current.{eventId}.*` (IDs change each week).
 
 ## Data source
 
@@ -63,9 +81,10 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) Games object model: `current/` + season archives + stable `views.*` (flat + JSON)
 * (Daniel Drießen) Fix favorite-team admin control: use `selectSendTo` (fresh team list on open; standard Save/Close toolbar)
 * (Daniel Drießen) VIS-1 widgets: NFL Scoreboard and Favorite Team card
-* (Daniel Drießen) ESPN CDN scoreboard polling loop; `nfl-games.*` live score objects; adaptive 30s/5min intervals
+* (Daniel Drießen) ESPN CDN scoreboard polling loop; adaptive 30s/5min intervals
 * (Daniel Drießen) Favorite-team admin multi-select; `isFavorite` states on team and game objects
 * (Daniel Drießen) Team folders keyed by ESPN team id; dynamic division season year
 * (Daniel Drießen) Team data, logos, division/venue enrichment

@@ -5,5 +5,21 @@
 	"favoriteTeamIds_help": "Open the dropdown to load the current NFL team list from the running adapter. Select one or more favorites, then use Save in the admin toolbar. The adapter writes isFavorite on each team's object and on every game where that team plays.",
 	"scoreboard_header": "Scoreboard",
 	"pollIntervalLiveSeconds": "Live scoreboard refresh interval (seconds)",
-	"pollIntervalLiveSeconds_help": "How often to refresh the scoreboard while NFL games are in progress (15–300 s). When no game is live the adapter polls every 5 minutes automatically."
+	"pollIntervalLiveSeconds_help": "How often to refresh the scoreboard while NFL games are in progress (15–300 s). When no game is live the adapter polls every 5 minutes automatically.",
+	"archive_header": "Game archive",
+	"archiveSeasonsToKeep": "Seasons to keep in archive",
+	"archiveSeasonsToKeep_help": "Keep the last N ESPN season years under nfl-games.archive. Use 0 to keep all seasons (unlimited).",
+	"archiveAllGames": "Archive all completed games",
+	"archiveAllGames_help": "When games leave the current scoreboard (after linger), store them under archive/all/{seasonYear}.",
+	"archiveFavoriteGames": "Archive favorite-team games",
+	"archiveFavoriteGames_help": "Also store full copies under archive/favorites/{seasonYear} when a favorite team played.",
+	"currentPostGameLingerHours": "Keep finished games in current (hours)",
+	"currentPostGameLingerHours_help": "After a game leaves the live scoreboard slate, keep it under nfl-games.current for this many hours before moving it to the archive (0 = move immediately).",
+	"views_header": "DIY views (stable datapoints)",
+	"focusPostGameLingerHours": "Favorite focus: show final result (hours)",
+	"focusPostGameLingerHours_help": "How long views.byTeam.{id}.focus stays on the finished result before switching to the next upcoming game.",
+	"viewsTodayMaxSlots": "Max games in today/live view slots",
+	"viewsTodayMaxSlots_help": "Number of flat slots under views.today.N and views.live.N (1–32). Bind these in VIS for DIY boards.",
+	"writeViewJson": "Also write JSON view mirrors",
+	"writeViewJson_help": "When enabled, writes JSON strings (e.g. views.today.scoreboard) for scripts and custom JS widgets. Flat states are always written."
 }

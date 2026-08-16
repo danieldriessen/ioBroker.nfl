@@ -82,7 +82,14 @@
 	},
 	"native": {
 		"favoriteTeamIds": [],
-		"pollIntervalLiveSeconds": 30
+		"pollIntervalLiveSeconds": 30,
+		"archiveSeasonsToKeep": 2,
+		"archiveAllGames": true,
+		"archiveFavoriteGames": true,
+		"currentPostGameLingerHours": 12,
+		"focusPostGameLingerHours": 24,
+		"viewsTodayMaxSlots": 16,
+		"writeViewJson": true
 	},
 	"objects": [],
 	"instanceObjects": [

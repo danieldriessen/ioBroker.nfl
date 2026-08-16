@@ -100,13 +100,13 @@ vis.binds["nfl"] = {
 
 	/**
 	 * Parses a flat ioBroker states object into an array of game objects.
-	 * Keys like "{instance}.nfl-games.{eventId}.home.score" are decomposed.
+	 * Keys like "{instance}.nfl-games.current.{eventId}.home.score" are decomposed.
 	 * @param {Object} states  Raw vis.conn.getStates result
 	 * @param {string} instance  e.g. "nfl.0"
 	 * @returns {Array<Object>}
 	 */
 	_parseGames: function (states, instance) {
-		var prefix = instance + ".nfl-games.";
+		var prefix = instance + ".nfl-games.current.";
 		var games = {};
 
 		for (var key in states) {
@@ -147,9 +147,8 @@ vis.binds["nfl"] = {
 	},
 
 	/**
-	 * Reads all nfl-games states for one adapter instance.
-	 * Strategy: read the eventIds JSON state first, then bulk-read all predictable
-	 * per-game state IDs via vis.conn.getStates (array form — no wildcard needed).
+	 * Reads all nfl-games.current states for one adapter instance.
+	 * Strategy: read currentEventIds (or legacy eventIds) first, then bulk-read game fields.
 	 * @param {string} instance
 	 * @param {function(Object)} callback  called with the flat states object
 	 */
@@ -160,13 +159,16 @@ vis.binds["nfl"] = {
 			instance + ".nfl-games.info.eventCount",
 			instance + ".nfl-games.info.seasonYear",
 			instance + ".nfl-games.info.week",
+			instance + ".nfl-games.info.currentEventIds",
 			instance + ".nfl-games.info.eventIds",
 		];
 
 		vis.conn.getStates(INFO_STATES, function (err, infoStates) {
 			if (err || !infoStates) { callback({}); return; }
 
-			var eventIdsRaw = infoStates[instance + ".nfl-games.info.eventIds"];
+			var eventIdsRaw =
+				(infoStates[instance + ".nfl-games.info.currentEventIds"]) ||
+				(infoStates[instance + ".nfl-games.info.eventIds"]);
 			var eventIds = [];
 			try {
 				eventIds = JSON.parse((eventIdsRaw && eventIdsRaw.val) || "[]");
@@ -190,7 +192,7 @@ vis.binds["nfl"] = {
 			var gameStateIds = [];
 			for (var i = 0; i < eventIds.length; i++) {
 				for (var j = 0; j < GAME_FIELDS.length; j++) {
-					gameStateIds.push(instance + ".nfl-games." + eventIds[i] + "." + GAME_FIELDS[j]);
+					gameStateIds.push(instance + ".nfl-games.current." + eventIds[i] + "." + GAME_FIELDS[j]);
 				}
 			}
 

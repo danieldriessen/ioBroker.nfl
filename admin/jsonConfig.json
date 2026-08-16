@@ -53,6 +53,116 @@
 			"md": 6,
 			"lg": 4,
 			"xl": 4
+		},
+		"archive_header": {
+			"type": "header",
+			"text": "archive_header",
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
+		},
+		"archiveSeasonsToKeep": {
+			"type": "number",
+			"label": "archiveSeasonsToKeep",
+			"help": "archiveSeasonsToKeep_help",
+			"newLine": true,
+			"default": 2,
+			"min": 0,
+			"max": 20,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"archiveAllGames": {
+			"type": "checkbox",
+			"label": "archiveAllGames",
+			"help": "archiveAllGames_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"archiveFavoriteGames": {
+			"type": "checkbox",
+			"label": "archiveFavoriteGames",
+			"help": "archiveFavoriteGames_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"currentPostGameLingerHours": {
+			"type": "number",
+			"label": "currentPostGameLingerHours",
+			"help": "currentPostGameLingerHours_help",
+			"newLine": true,
+			"default": 12,
+			"min": 0,
+			"max": 168,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"views_header": {
+			"type": "header",
+			"text": "views_header",
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
+		},
+		"focusPostGameLingerHours": {
+			"type": "number",
+			"label": "focusPostGameLingerHours",
+			"help": "focusPostGameLingerHours_help",
+			"newLine": true,
+			"default": 24,
+			"min": 0,
+			"max": 168,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"viewsTodayMaxSlots": {
+			"type": "number",
+			"label": "viewsTodayMaxSlots",
+			"help": "viewsTodayMaxSlots_help",
+			"default": 16,
+			"min": 1,
+			"max": 32,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"writeViewJson": {
+			"type": "checkbox",
+			"label": "writeViewJson",
+			"help": "writeViewJson_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
 		}
 	}
 }

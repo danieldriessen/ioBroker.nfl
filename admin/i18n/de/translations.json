@@ -5,5 +5,21 @@
 	"favoriteTeamIds_help": "Öffne die Auswahlliste, um die aktuelle Team-Liste vom laufenden Adapter zu laden. Wähle einen oder mehrere Favoriten und speichere mit Speichern in der Admin-Leiste. Der Adapter setzt isFavorite am Team-Objekt und an jedem Spiel, in dem das Team antritt.",
 	"scoreboard_header": "Ergebnisanzeige",
 	"pollIntervalLiveSeconds": "Live-Aktualisierungsintervall (Sekunden)",
-	"pollIntervalLiveSeconds_help": "Wie oft das Scoreboard während laufender Spiele aktualisiert wird (15–300 s). Wenn kein Spiel läuft, fragt der Adapter automatisch alle 5 Minuten ab."
+	"pollIntervalLiveSeconds_help": "Wie oft das Scoreboard während laufender Spiele aktualisiert wird (15–300 s). Wenn kein Spiel läuft, fragt der Adapter automatisch alle 5 Minuten ab.",
+	"archive_header": "Spielarchiv",
+	"archiveSeasonsToKeep": "Zu behaltende Saisons im Archiv",
+	"archiveSeasonsToKeep_help": "Behält die letzten N ESPN-Saisonjahre unter nfl-games.archive. 0 = alle Saisons behalten (unbegrenzt).",
+	"archiveAllGames": "Alle beendeten Spiele archivieren",
+	"archiveAllGames_help": "Wenn Spiele die aktuelle Scoreboard-Liste verlassen (nach Linger), unter archive/all/{seasonYear} speichern.",
+	"archiveFavoriteGames": "Favoriten-Spiele archivieren",
+	"archiveFavoriteGames_help": "Zusätzlich volle Kopien unter archive/favorites/{seasonYear}, wenn ein Favoritenteam mitgespielt hat.",
+	"currentPostGameLingerHours": "Beendete Spiele in current behalten (Stunden)",
+	"currentPostGameLingerHours_help": "Nachdem ein Spiel die Live-Scoreboard-Liste verlassen hat, noch so viele Stunden unter nfl-games.current lassen, bevor es ins Archiv wandert (0 = sofort).",
+	"views_header": "DIY-Views (stabile Datenpunkte)",
+	"focusPostGameLingerHours": "Favoriten-Focus: Endergebnis anzeigen (Stunden)",
+	"focusPostGameLingerHours_help": "Wie lange views.byTeam.{id}.focus das Endergebnis zeigt, bevor zum nächsten Upcoming gewechselt wird.",
+	"viewsTodayMaxSlots": "Max. Spiele in today/live-Slots",
+	"viewsTodayMaxSlots_help": "Anzahl flacher Slots unter views.today.N und views.live.N (1–32). Diese in VIS für eigene Boards binden.",
+	"writeViewJson": "Auch JSON-View-Spiegel schreiben",
+	"writeViewJson_help": "Schreibt zusätzlich JSON-Strings (z. B. views.today.scoreboard) für Scripts und eigene JS-Widgets. Flache States werden immer geschrieben."
 }
