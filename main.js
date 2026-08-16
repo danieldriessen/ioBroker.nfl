@@ -131,6 +131,7 @@ const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE = "archive";
 const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_ALL = "all";
 const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__ARCHIVE_FAVORITES = "favorites";
 const IOBROKER_OBJECT_ID__FOLDER__VIEWS = "views";
+const IOBROKER_OBJECT_ID__FOLDER__SCHEDULE = "schedule";
 const IOBROKER_OBJECT_ID__STATE__LEFT_SLATE_AT = "_leftSlateAt";
 
 // Scoreboard poll settings
@@ -138,6 +139,17 @@ const URL_ESPN_CDN_SCOREBOARD = "https://cdn.espn.com/core/nfl/scoreboard?xhr=1&
 const SCOREBOARD_POLL_INTERVAL_IDLE_MS = 300_000; // 5 min when no live games
 const SCOREBOARD_POLL_INTERVAL_MIN_S = 15;
 const SCOREBOARD_POLL_INTERVAL_MAX_S = 300;
+const SCHEDULE_POLL_INTERVAL_MIN_H = 1;
+const SCHEDULE_POLL_INTERVAL_MAX_H = 48;
+const SCHEDULE_POLL_INTERVAL_DEFAULT_H = 6;
+/** @type {Record<number, string>} */
+const ESPN_SEASON_TYPE_NAMES = {
+	1: "Preseason",
+	2: "Regular Season",
+	3: "Postseason",
+};
+const URL_ESPN_API_NFL_WEEKS =
+	"https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/{YEAR}/types/{SEASON_TYPE}/weeks?limit=50";
 
 // Define Paths
 const SUBPATH__NFL_TEAM_LOGO_IMAGES = "NFL-Team Logos";
@@ -183,6 +195,12 @@ class Nfl extends utils.Adapter {
 		this.nflDivisionSeasonYear = null;
 		/** @type {ReturnType<typeof setTimeout>|null} */
 		this._scoreboardTimer = null;
+		/** @type {ReturnType<typeof setTimeout>|null} */
+		this._scheduleTimer = null;
+		/** @type {object[]} Last scoreboard-week games (for views merge) */
+		this._currentGames = [];
+		/** @type {object[]} Multi-week schedule games (for focus / next favorite) */
+		this._scheduleGames = [];
 	}
 
 	/**************************************************************************************************************************************
@@ -250,8 +268,9 @@ class Nfl extends utils.Adapter {
 		// Initialization completed successfully
 		await this.setStateAsync("info.connection", true, true);
 
-		// Start scoreboard polling loop
+		// Start scoreboard + multi-week schedule polling loops
 		this._startScoreboardLoop();
+		this._startScheduleLoop();
 	}
 
 	/**************************************************************************************************************************************
@@ -760,6 +779,25 @@ class Nfl extends utils.Adapter {
 		return this.config.archiveFavoriteGames !== false;
 	}
 
+	/** @returns {boolean} */
+	_scheduleEnabled() {
+		return this.config.scheduleEnabled !== false;
+	}
+
+	/** @returns {number} schedule poll interval in ms */
+	_schedulePollIntervalMs() {
+		const raw = Number(this.config.schedulePollIntervalHours);
+		const hours = Number.isFinite(raw)
+			? Math.min(SCHEDULE_POLL_INTERVAL_MAX_H, Math.max(SCHEDULE_POLL_INTERVAL_MIN_H, raw))
+			: SCHEDULE_POLL_INTERVAL_DEFAULT_H;
+		if (hours !== raw && Number.isFinite(raw)) {
+			this.log.warn(
+				`schedulePollIntervalHours ${raw} out of range [${SCHEDULE_POLL_INTERVAL_MIN_H}, ${SCHEDULE_POLL_INTERVAL_MAX_H}]; using ${hours}.`,
+			);
+		}
+		return hours * 3600 * 1000;
+	}
+
 	/**
 	 * Kicks off the first scoreboard fetch and schedules subsequent ones.
 	 * Uses a recursive setTimeout so polls never overlap.
@@ -784,18 +822,72 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
+	 * Slow multi-week schedule loop (separate from live scoreboard cadence).
+	 */
+	_startScheduleLoop() {
+		if (!this._scheduleEnabled()) {
+			this.log.info("Multi-week schedule polling disabled in admin.");
+			return;
+		}
+		const tick = async () => {
+			if (this._scheduleTimer === null) {
+				return;
+			}
+			try {
+				await this.fetchAndStoreSchedule();
+			} catch (error) {
+				this.log.error(`Schedule poll failed: ${error.message}`);
+			}
+			if (this._scheduleTimer !== null) {
+				this._scheduleTimer = setTimeout(tick, this._schedulePollIntervalMs());
+			}
+		};
+		// Delay first schedule run so scoreboard can populate first
+		this._scheduleTimer = setTimeout(tick, 15_000);
+	}
+
+	/**
+	 * Merges current slate + schedule games; current slate wins on duplicate event IDs.
+	 * @param {object[]} currentGames
+	 * @param {object[]} scheduleGames
+	 * @returns {object[]}
+	 */
+	_mergeGamesUniverse(currentGames, scheduleGames) {
+		/** @type {Map<string, object>} */
+		const byId = new Map();
+		for (const g of scheduleGames || []) {
+			if (g?.id) {
+				byId.set(String(g.id), g);
+			}
+		}
+		for (const g of currentGames || []) {
+			if (g?.id) {
+				byId.set(String(g.id), g);
+			}
+		}
+		return [...byId.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+	}
+
+	/**
 	 * Normalizes one ESPN scoreboard event into a compact game DTO.
 	 * @param {object} ev
 	 * @param {number|null} seasonYear
 	 * @param {number|null} weekNumber
+	 * @param {number|null} seasonType
 	 * @param {Set<string>} favoriteTeamIds
 	 */
-	_normalizeScoreboardEvent(ev, seasonYear, weekNumber, favoriteTeamIds) {
+	_normalizeScoreboardEvent(ev, seasonYear, weekNumber, seasonType, favoriteTeamIds) {
 		const eventId = String(ev.id || "");
 		const comp = (ev.competitions || [])[0] || {};
 		const statusObj = comp.status || {};
 		const statusType = statusObj.type || {};
 		const competitors = comp.competitors || [];
+		const venue = comp.venue || {};
+		const venueAddress = venue.address || {};
+		const broadcasts = Array.isArray(comp.broadcasts) ? comp.broadcasts : [];
+		const broadcastNames = broadcasts
+			.flatMap((b) => (Array.isArray(b?.names) ? b.names : []))
+			.filter(Boolean);
 		/** @type {Record<string, object>} */
 		const sides = {};
 		for (const side of ["home", "away"]) {
@@ -817,6 +909,7 @@ class Nfl extends utils.Adapter {
 			shortName: ev.shortName ?? "",
 			date: ev.date ?? "",
 			seasonYear: seasonYear,
+			seasonType: seasonType,
 			week: weekNumber,
 			status: {
 				state: statusType.state ?? "",
@@ -829,6 +922,15 @@ class Nfl extends utils.Adapter {
 			},
 			home: sides.home,
 			away: sides.away,
+			venue: {
+				id: venue.id != null ? String(venue.id) : "",
+				fullName: venue.fullName ?? "",
+				city: venueAddress.city ?? "",
+				state: venueAddress.state ?? "",
+				indoor: !!venue.indoor,
+			},
+			broadcasts: broadcastNames.join(", "),
+			attendance: Number(comp.attendance) || 0,
 		};
 	}
 
@@ -844,6 +946,7 @@ class Nfl extends utils.Adapter {
 			shortName: game.shortName,
 			date: game.date,
 			seasonYear: game.seasonYear,
+			seasonType: game.seasonType,
 			week: game.week,
 			status: game.status?.state ?? "",
 			clock: game.status?.displayClock ?? "",
@@ -851,6 +954,9 @@ class Nfl extends utils.Adapter {
 			detail: game.status?.detail ?? "",
 			completed: !!game.status?.completed,
 			phase: game.phase || undefined,
+			venue: game.venue?.fullName || "",
+			broadcasts: game.broadcasts || "",
+			attendance: game.attendance || 0,
 			home: {
 				id: game.home?.teamId ?? "",
 				abbr: game.home?.abbreviation ?? "",
@@ -889,9 +995,16 @@ class Nfl extends utils.Adapter {
 		await this._setSimpleState(`${basePath}.shortName`, "Short name", "string", "value", game.shortName ?? "");
 		await this._setSimpleState(`${basePath}.date`, "Kickoff (UTC)", "string", "value.time", game.date ?? "");
 		await this._setSimpleState(`${basePath}.seasonYear`, "Season year", "number", "value", game.seasonYear ?? 0);
+		await this._setSimpleState(`${basePath}.seasonType`, "Season type", "number", "value", game.seasonType ?? 0);
 		await this._setSimpleState(`${basePath}.week`, "Week", "number", "value", game.week ?? 0);
 		await this._setSimpleState(`${basePath}.eventId`, "ESPN event ID", "string", "value", game.id ?? "");
 		await this._setSimpleState(`${basePath}.headline`, "Headline", "string", "text", game.shortName || game.name || "");
+		const sourcePath =
+			game.path ||
+			(game.sourcePath ? String(game.sourcePath) : `${this.namespace}.${basePath}`);
+		await this._setSimpleState(`${basePath}.sourcePath`, "Canonical object path", "string", "value", sourcePath);
+		await this._setSimpleState(`${basePath}.broadcasts`, "Broadcasts", "string", "value", game.broadcasts ?? "");
+		await this._setSimpleState(`${basePath}.attendance`, "Attendance", "number", "value", game.attendance ?? 0);
 
 		if (opts.includePhase) {
 			await this._setSimpleState(`${basePath}.phase`, "View phase", "string", "value", opts.phase || game.phase || "idle");
@@ -911,6 +1024,19 @@ class Nfl extends utils.Adapter {
 		await this._setSimpleState(`${statusPath}.period`, "Period", "number", "value", st.period ?? 0);
 		await this._setSimpleState(`${statusPath}.displayClock`, "Clock", "string", "value", st.displayClock ?? "");
 		await this._setSimpleState(`${statusPath}.completed`, "Completed", "boolean", "indicator", !!st.completed);
+
+		const venue = game.venue || {};
+		const venuePath = `${basePath}.venue`;
+		await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(venuePath), {
+			type: "channel",
+			common: { name: "Venue" },
+			native: {},
+		});
+		await this._setSimpleState(`${venuePath}.id`, "Venue ID", "string", "value", venue.id ?? "");
+		await this._setSimpleState(`${venuePath}.fullName`, "Venue name", "string", "value", venue.fullName ?? "");
+		await this._setSimpleState(`${venuePath}.city`, "City", "string", "value", venue.city ?? "");
+		await this._setSimpleState(`${venuePath}.state`, "State", "string", "value", venue.state ?? "");
+		await this._setSimpleState(`${venuePath}.indoor`, "Indoor", "boolean", "indicator", !!venue.indoor);
 
 		for (const side of ["home", "away"]) {
 			const c = game[side] || {};
@@ -949,8 +1075,13 @@ class Nfl extends utils.Adapter {
 			shortName: "",
 			date: "",
 			seasonYear: 0,
+			seasonType: 0,
 			week: 0,
 			phase: "idle",
+			path: "",
+			broadcasts: "",
+			attendance: 0,
+			venue: { id: "", fullName: "", city: "", state: "", indoor: false },
 			status: {
 				state: "",
 				name: "",
@@ -1031,6 +1162,7 @@ class Nfl extends utils.Adapter {
 
 		const events = sbData.events;
 		const seasonYear = sbData.season?.year ?? null;
+		const seasonType = sbData.season?.type ?? null;
 		const weekNumber = sbData.week?.number ?? null;
 		const favoriteTeamIds = this._getFavoriteTeamIds();
 
@@ -1067,7 +1199,7 @@ class Nfl extends utils.Adapter {
 			if (!ev?.id) {
 				continue;
 			}
-			const game = this._normalizeScoreboardEvent(ev, seasonYear, weekNumber, favoriteTeamIds);
+			const game = this._normalizeScoreboardEvent(ev, seasonYear, weekNumber, seasonType, favoriteTeamIds);
 			games.path = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__CURRENT}.${game.id}`;
 			games.push(game);
 			if (game.status.state === "in") {
@@ -1081,6 +1213,7 @@ class Nfl extends utils.Adapter {
 		await this._setSimpleState(`${infoPath}.liveGameCount`, "Live game count", "number", "value", liveCount);
 		await this._setSimpleState(`${infoPath}.eventCount`, "Event count", "number", "value", games.length);
 		await this._setSimpleState(`${infoPath}.seasonYear`, "Season year", "number", "value", seasonYear);
+		await this._setSimpleState(`${infoPath}.seasonType`, "Season type", "number", "value", seasonType);
 		await this._setSimpleState(`${infoPath}.week`, "Week", "number", "value", weekNumber);
 		const nextPollS = liveCount > 0 ? this._livePollIntervalMs() / 1000 : SCOREBOARD_POLL_INTERVAL_IDLE_MS / 1000;
 		await this._setSimpleState(`${infoPath}.nextPollSeconds`, "Next poll in (s)", "number", "value", nextPollS);
@@ -1099,6 +1232,7 @@ class Nfl extends utils.Adapter {
 
 		await this._deleteLegacyFlatGameFolders();
 		await this._enforceArchiveSeasonRetention(seasonYear);
+		this._currentGames = games;
 		await this._updateDiyViews(games, favoriteTeamIds);
 
 		this.log.debug(`Scoreboard stored: ${games.length} current events, ${liveCount} live.`);
@@ -1328,6 +1462,215 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
+	 * Lists ESPN week numbers for a season year + type (core API).
+	 * @param {number} year
+	 * @param {number} seasonType
+	 * @returns {Promise<number[]>}
+	 */
+	async _fetchEspnWeekNumbers(year, seasonType) {
+		const url = URL_ESPN_API_NFL_WEEKS.replace("{YEAR}", String(year)).replace("{SEASON_TYPE}", String(seasonType));
+		const response = await axios.get(url, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+		const items = response.data?.items;
+		if (!Array.isArray(items)) {
+			return [];
+		}
+		/** @type {number[]} */
+		const weeks = [];
+		for (const item of items) {
+			const ref = String(item?.$ref || "");
+			const m = ref.match(/\/weeks\/(\d+)/);
+			if (m) {
+				weeks.push(Number(m[1]));
+			}
+		}
+		return weeks.sort((a, b) => a - b);
+	}
+
+	/**
+	 * Fetches one CDN scoreboard week and returns normalized games.
+	 * @param {number} year
+	 * @param {number} seasonType
+	 * @param {number} week
+	 * @param {Set<string>} favoriteTeamIds
+	 * @returns {Promise<object[]>}
+	 */
+	async _fetchCdnScoreboardWeek(year, seasonType, week, favoriteTeamIds) {
+		const url = `${URL_ESPN_CDN_SCOREBOARD}&week=${week}&seasontype=${seasonType}&year=${year}`;
+		const response = await axios.get(url, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+		const sbData = response.data?.content?.sbData;
+		if (!sbData || !Array.isArray(sbData.events)) {
+			return [];
+		}
+		const seasonYear = sbData.season?.year ?? year;
+		const type = sbData.season?.type ?? seasonType;
+		const weekNumber = sbData.week?.number ?? week;
+		/** @type {object[]} */
+		const games = [];
+		for (const ev of sbData.events) {
+			if (!ev?.id) {
+				continue;
+			}
+			games.push(this._normalizeScoreboardEvent(ev, seasonYear, weekNumber, type, favoriteTeamIds));
+		}
+		return games;
+	}
+
+	/**
+	 * Builds multi-week `schedule/{year}/type{N}/week{M}/{eventId}` and refreshes views.
+	 */
+	async fetchAndStoreSchedule() {
+		if (!this._scheduleEnabled()) {
+			return;
+		}
+
+		this.log.info("Fetching multi-week NFL schedule from ESPN CDN…");
+		const favoriteTeamIds = this._getFavoriteTeamIds();
+
+		// Resolve active season year from live scoreboard (CDN default)
+		const metaResponse = await axios.get(URL_ESPN_CDN_SCOREBOARD, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+		const metaSb = metaResponse.data?.content?.sbData;
+		const seasonYear = Number(metaSb?.season?.year) || new Date().getFullYear();
+
+		await this.setObjectNotExistsAsync(IOBROKER_OBJECT_ID__FOLDER__SCHEDULE, {
+			type: "folder",
+			common: { name: "NFL Schedule" },
+			native: {},
+		});
+		const infoPath = `${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.info`;
+		await this.setObjectNotExistsAsync(infoPath, {
+			type: "channel",
+			common: { name: "Schedule info" },
+			native: {},
+		});
+		const yearPath = `${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.${seasonYear}`;
+		await this.setObjectNotExistsAsync(yearPath, {
+			type: "folder",
+			common: { name: `Season ${seasonYear}` },
+			native: {},
+		});
+
+		/** @type {object[]} */
+		const allGames = [];
+		let weekFetches = 0;
+
+		for (const seasonType of [1, 2, 3]) {
+			let weeks = [];
+			try {
+				weeks = await this._fetchEspnWeekNumbers(seasonYear, seasonType);
+			} catch (error) {
+				this.log.warn(`Could not list schedule weeks for ${seasonYear} type ${seasonType}: ${error.message}`);
+				continue;
+			}
+			if (!weeks.length) {
+				continue;
+			}
+
+			const typePath = `${yearPath}.type${seasonType}`;
+			await this.setObjectNotExistsAsync(typePath, {
+				type: "folder",
+				common: { name: ESPN_SEASON_TYPE_NAMES[seasonType] || `Type ${seasonType}` },
+				native: {},
+			});
+
+			for (const week of weeks) {
+				weekFetches++;
+				let weekGames = [];
+				try {
+					weekGames = await this._fetchCdnScoreboardWeek(seasonYear, seasonType, week, favoriteTeamIds);
+				} catch (error) {
+					this.log.warn(`Schedule week ${seasonYear}/t${seasonType}/w${week} failed: ${error.message}`);
+					continue;
+				}
+
+				const weekPath = `${typePath}.week${week}`;
+				await this.setObjectNotExistsAsync(weekPath, {
+					type: "folder",
+					common: { name: `Week ${week}` },
+					native: {},
+				});
+				await this._setSimpleState(`${weekPath}.eventCount`, "Event count", "number", "value", weekGames.length);
+
+				/** @type {Set<string>} */
+				const weekKeep = new Set();
+				for (const game of weekGames) {
+					const eventPath = `${weekPath}.${game.id}`;
+					game.path = `${this.namespace}.${eventPath}`;
+					await this._writeGameChannel(eventPath, game);
+					allGames.push(game);
+					weekKeep.add(String(game.id));
+				}
+
+				// Prune removed events under this week folder
+				const weekPrefix = `${this.namespace}.${weekPath}.`;
+				try {
+					const objects = await this.getAdapterObjectsAsync();
+					/** @type {Set<string>} */
+					const existing = new Set();
+					for (const fullId of Object.keys(objects || {})) {
+						if (!fullId.startsWith(weekPrefix)) {
+							continue;
+						}
+						const rest = fullId.slice(weekPrefix.length);
+						const eventId = rest.split(".")[0];
+						if (eventId && /^\d+$/.test(eventId)) {
+							existing.add(eventId);
+						}
+					}
+					for (const eventId of existing) {
+						if (!weekKeep.has(eventId)) {
+							await this.delObjectAsync(`${weekPath}.${eventId}`, { recursive: true });
+						}
+					}
+				} catch (error) {
+					this.log.warn(`Could not prune schedule week ${weekPath}: ${error.message}`);
+				}
+			}
+		}
+
+		// Drop other season years under schedule/
+		try {
+			const objects = await this.getAdapterObjectsAsync();
+			const rootPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.`;
+			/** @type {Set<string>} */
+			const years = new Set();
+			for (const fullId of Object.keys(objects || {})) {
+				if (!fullId.startsWith(rootPrefix)) {
+					continue;
+				}
+				const top = fullId.slice(rootPrefix.length).split(".")[0];
+				if (top && /^\d{4}$/.test(top)) {
+					years.add(top);
+				}
+			}
+			for (const y of years) {
+				if (Number(y) !== seasonYear) {
+					await this.delObjectAsync(`${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.${y}`, { recursive: true });
+					this.log.info(`Removed schedule season ${y} (keeping ${seasonYear}).`);
+				}
+			}
+		} catch (error) {
+			this.log.warn(`Could not prune old schedule seasons: ${error.message}`);
+		}
+
+		this._scheduleGames = allGames;
+		const now = new Date().toISOString();
+		await this._setSimpleState(`${infoPath}.lastUpdate`, "Last update", "string", "value", now);
+		await this._setSimpleState(`${infoPath}.seasonYear`, "Season year", "number", "value", seasonYear);
+		await this._setSimpleState(`${infoPath}.eventCount`, "Event count", "number", "value", allGames.length);
+		await this._setSimpleState(`${infoPath}.weekFetches`, "Week fetches last run", "number", "value", weekFetches);
+		await this._setSimpleState(
+			`${infoPath}.nextPollHours`,
+			"Next schedule poll (h)",
+			"number",
+			"value",
+			this._schedulePollIntervalMs() / 3600000,
+		);
+
+		await this._updateDiyViews(this._currentGames || [], favoriteTeamIds);
+		this.log.info(`Schedule stored: ${allGames.length} events across ${weekFetches} week fetches (season ${seasonYear}).`);
+	}
+
+	/**
 	 * Updates stable DIY view slots, byTeam.focus, and optional JSON mirrors.
 	 * @param {object[]} games
 	 * @param {Set<string>} favoriteTeamIds
@@ -1336,11 +1679,12 @@ class Nfl extends utils.Adapter {
 		const maxSlots = this._viewsTodayMaxSlots();
 		const todayKey = this._localDateKey(new Date().toISOString());
 		const sorted = games.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+		const universe = this._mergeGamesUniverse(sorted, this._scheduleGames || []);
 
 		const todayGames = sorted.filter((g) => this._localDateKey(g.date) === todayKey);
 		const liveGames = sorted.filter((g) => g.status.state === "in");
 		const favToday = todayGames.filter((g) => g.home?.isFavorite || g.away?.isFavorite);
-		const favCurrent = sorted.filter((g) => g.home?.isFavorite || g.away?.isFavorite);
+		const favUniverse = universe.filter((g) => g.home?.isFavorite || g.away?.isFavorite);
 
 		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.today`, "Today's games", todayGames, maxSlots);
 		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.live`, "Live games", liveGames, maxSlots);
@@ -1360,13 +1704,17 @@ class Nfl extends utils.Adapter {
 					"Favorite games current slate (JSON)",
 					"string",
 					"value.json",
-					JSON.stringify(favCurrent.map((g) => this._gameToViewJson(g, g.path))),
+					JSON.stringify(
+						sorted
+							.filter((g) => g.home?.isFavorite || g.away?.isFavorite)
+							.map((g) => this._gameToViewJson(g, g.path)),
+					),
 				);
 
-				const nextFav = favCurrent
+				const nextFav = favUniverse
 					.filter((g) => g.status.state === "pre")
 					.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
-				const lastFav = favCurrent
+				const lastFav = favUniverse
 					.filter((g) => g.status.state === "post")
 					.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
 				await this._setSimpleState(
@@ -1433,7 +1781,7 @@ class Nfl extends utils.Adapter {
 		}
 
 		for (const teamId of [...teamIds].sort((a, b) => Number(a) - Number(b))) {
-			const involving = sorted.filter((g) => g.home?.teamId === teamId || g.away?.teamId === teamId);
+			const involving = universe.filter((g) => g.home?.teamId === teamId || g.away?.teamId === teamId);
 			let chosen = null;
 			let phase = "idle";
 
@@ -1465,14 +1813,27 @@ class Nfl extends utils.Adapter {
 				}
 			}
 
-			const focusPath = `${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}.focus`;
-			await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}`, {
-				type: "folder",
-				common: { name: teamNames.get(teamId) || `Team ${teamId}` },
-				native: {},
-			});
+			const teamFolder = `${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}`;
+			const teamLabel = teamNames.get(teamId) || `Team ${teamId}`;
+			const existingTeamObj = await this.getObjectAsync(replaceForbiddenCharactersInObjectID(teamFolder));
+			if (existingTeamObj) {
+				existingTeamObj.common = existingTeamObj.common || {};
+				existingTeamObj.common.name = teamLabel;
+				await this.setObjectAsync(replaceForbiddenCharactersInObjectID(teamFolder), existingTeamObj);
+			} else {
+				await this.setObjectNotExistsAsync(teamFolder, {
+					type: "folder",
+					common: { name: teamLabel },
+					native: {},
+				});
+			}
+
+			const focusPath = `${teamFolder}.focus`;
 			const dto = chosen ? { ...chosen, phase } : this._idleGameDto();
 			dto.phase = phase;
+			if (chosen?.path) {
+				dto.path = chosen.path;
+			}
 			await this._writeGameChannel(focusPath, dto, { includePhase: true, phase });
 		}
 	}
@@ -3143,6 +3504,10 @@ class Nfl extends utils.Adapter {
 			if (this._scoreboardTimer !== null) {
 				clearTimeout(this._scoreboardTimer);
 				this._scoreboardTimer = null;
+			}
+			if (this._scheduleTimer !== null) {
+				clearTimeout(this._scheduleTimer);
+				this._scheduleTimer = null;
 			}
 			callback();
 		} catch (e) {

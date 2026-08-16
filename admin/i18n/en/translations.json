@@ -22,6 +22,11 @@
 	"viewsTodayMaxSlots_help": "Maximum number of numbered slots under views.today / views.live / views.favorites.today (1–32). Slots are only created while games exist there — empty placeholders are not kept.",
 	"writeViewJson": "Also write JSON view mirrors",
 	"writeViewJson_help": "When enabled, writes JSON strings (e.g. views.today.scoreboard) for scripts and custom JS widgets. Flat states are always written.",
+	"schedule_header": "Multi-week schedule",
+	"scheduleEnabled": "Fetch multi-week schedule",
+	"scheduleEnabled_help": "When enabled, builds schedule/{seasonYear}/type{N}/week{M}/{eventId} from ESPN (preseason, regular, postseason). Used for byTeam focus and next-favorite beyond the live scoreboard week.",
+	"schedulePollIntervalHours": "Schedule refresh interval (hours)",
+	"schedulePollIntervalHours_help": "How often to refresh the full multi-week schedule (1–48 h). Independent of the live scoreboard poll.",
 	"storage_header": "Image storage",
 	"writeLogoBase64": "Store logo base64 in objects",
 	"writeLogoBase64_help": "Off by default (recommended). Logos stay as files under the adapter namespace; VIS widgets use ESPN CDN URLs. Enable only if you need base64/icon data in the object tree."

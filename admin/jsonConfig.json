@@ -164,6 +164,42 @@
 			"lg": 4,
 			"xl": 4
 		},
+		"schedule_header": {
+			"type": "header",
+			"text": "schedule_header",
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
+		},
+		"scheduleEnabled": {
+			"type": "checkbox",
+			"label": "scheduleEnabled",
+			"help": "scheduleEnabled_help",
+			"default": true,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"schedulePollIntervalHours": {
+			"type": "number",
+			"label": "schedulePollIntervalHours",
+			"help": "schedulePollIntervalHours_help",
+			"default": 6,
+			"min": 1,
+			"max": 48,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
 		"storage_header": {
 			"type": "header",
 			"text": "storage_header",

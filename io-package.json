@@ -90,6 +90,8 @@
 		"focusPostGameLingerHours": 24,
 		"viewsTodayMaxSlots": 16,
 		"writeViewJson": true,
+		"scheduleEnabled": true,
+		"schedulePollIntervalHours": 6,
 		"writeLogoBase64": false
 	},
 	"objects": [],
