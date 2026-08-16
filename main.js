@@ -217,6 +217,13 @@ class Nfl extends utils.Adapter {
 		// Reset the connection indicator during startup (to 'false')
 		this.setState("info.connection", false, true);
 
+		// Drop legacy fat schedule trees ASAP (can be 10k+ objects and trip instance limits)
+		try {
+			await this._pruneLegacyScheduleTrees();
+		} catch (error) {
+			this.log.warn(`Legacy schedule prune on startup failed: ${error.message}`);
+		}
+
 		try {
 			await this.refreshTeamMasterData({ reason: "startup" });
 		} catch (error) {
@@ -954,7 +961,7 @@ class Nfl extends utils.Adapter {
 				this._scheduleTimer = setTimeout(tick, this._schedulePollIntervalMs());
 			}
 		};
-		// Delay first schedule run so scoreboard can populate first
+		// First schedule run soon after startup (scoreboard usually already ticking)
 		this._scheduleTimer = setTimeout(tick, 15_000);
 	}
 
@@ -1706,7 +1713,8 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
-	 * Builds multi-week `schedule/{year}/type{N}/week{M}/{eventId}` and refreshes views.
+	 * Builds a compact multi-week schedule in memory and stores **JSON only** under `schedule.info`
+	 * (no per-event object trees — those blew past ioBroker instance object limits).
 	 */
 	async fetchAndStoreSchedule() {
 		if (!this._scheduleEnabled()) {
@@ -1716,7 +1724,6 @@ class Nfl extends utils.Adapter {
 		this.log.info("Fetching multi-week NFL schedule from ESPN CDN…");
 		const favoriteTeamIds = this._getFavoriteTeamIds();
 
-		// Resolve active season year from live scoreboard (CDN default)
 		const metaResponse = await axios.get(URL_ESPN_CDN_SCOREBOARD, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
 		const metaSb = metaResponse.data?.content?.sbData;
 		const seasonYear = Number(metaSb?.season?.year) || new Date().getFullYear();
@@ -1732,15 +1739,11 @@ class Nfl extends utils.Adapter {
 			common: { name: "Schedule info" },
 			native: {},
 		});
-		const yearPath = `${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.${seasonYear}`;
-		await this.setObjectNotExistsAsync(yearPath, {
-			type: "folder",
-			common: { name: `Season ${seasonYear}` },
-			native: {},
-		});
 
 		/** @type {object[]} */
 		const allGames = [];
+		/** @type {Record<string, object[]>} */
+		const byWeek = {};
 		let weekFetches = 0;
 
 		for (const seasonType of [1, 2, 3]) {
@@ -1755,13 +1758,6 @@ class Nfl extends utils.Adapter {
 				continue;
 			}
 
-			const typePath = `${yearPath}.type${seasonType}`;
-			await this.setObjectNotExistsAsync(typePath, {
-				type: "folder",
-				common: { name: ESPN_SEASON_TYPE_NAMES[seasonType] || `Type ${seasonType}` },
-				native: {},
-			});
-
 			for (const week of weeks) {
 				weekFetches++;
 				let weekGames = [];
@@ -1772,75 +1768,19 @@ class Nfl extends utils.Adapter {
 					continue;
 				}
 
-				const weekPath = `${typePath}.week${week}`;
-				await this.setObjectNotExistsAsync(weekPath, {
-					type: "folder",
-					common: { name: `Week ${week}` },
-					native: {},
-				});
-				await this._setSimpleState(`${weekPath}.eventCount`, "Event count", "number", "value", weekGames.length);
-
-				/** @type {Set<string>} */
-				const weekKeep = new Set();
+				const key = `t${seasonType}.w${week}`;
+				const compact = [];
 				for (const game of weekGames) {
-					const eventPath = `${weekPath}.${game.id}`;
-					game.path = `${this.namespace}.${eventPath}`;
-					await this._writeGameChannel(eventPath, game);
+					game.path = `${this.namespace}.${infoPath}.events`;
 					allGames.push(game);
-					weekKeep.add(String(game.id));
+					compact.push(this._gameToViewJson(game, game.path));
 				}
-
-				// Prune removed events under this week folder
-				const weekPrefix = `${this.namespace}.${weekPath}.`;
-				try {
-					const objects = await this.getAdapterObjectsAsync();
-					/** @type {Set<string>} */
-					const existing = new Set();
-					for (const fullId of Object.keys(objects || {})) {
-						if (!fullId.startsWith(weekPrefix)) {
-							continue;
-						}
-						const rest = fullId.slice(weekPrefix.length);
-						const eventId = rest.split(".")[0];
-						if (eventId && /^\d+$/.test(eventId)) {
-							existing.add(eventId);
-						}
-					}
-					for (const eventId of existing) {
-						if (!weekKeep.has(eventId)) {
-							await this.delObjectAsync(`${weekPath}.${eventId}`, { recursive: true });
-						}
-					}
-				} catch (error) {
-					this.log.warn(`Could not prune schedule week ${weekPath}: ${error.message}`);
-				}
+				byWeek[key] = compact;
 			}
 		}
 
-		// Drop other season years under schedule/
-		try {
-			const objects = await this.getAdapterObjectsAsync();
-			const rootPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.`;
-			/** @type {Set<string>} */
-			const years = new Set();
-			for (const fullId of Object.keys(objects || {})) {
-				if (!fullId.startsWith(rootPrefix)) {
-					continue;
-				}
-				const top = fullId.slice(rootPrefix.length).split(".")[0];
-				if (top && /^\d{4}$/.test(top)) {
-					years.add(top);
-				}
-			}
-			for (const y of years) {
-				if (Number(y) !== seasonYear) {
-					await this.delObjectAsync(`${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.${y}`, { recursive: true });
-					this.log.info(`Removed schedule season ${y} (keeping ${seasonYear}).`);
-				}
-			}
-		} catch (error) {
-			this.log.warn(`Could not prune old schedule seasons: ${error.message}`);
-		}
+		// Remove legacy fat per-event schedule trees (season year folders)
+		await this._pruneLegacyScheduleTrees();
 
 		this._scheduleGames = allGames;
 		const now = new Date().toISOString();
@@ -1855,10 +1795,135 @@ class Nfl extends utils.Adapter {
 			"value",
 			this._schedulePollIntervalMs() / 3600000,
 		);
+		await this._setSimpleState(
+			`${infoPath}.events`,
+			"All schedule events (JSON)",
+			"string",
+			"value.json",
+			JSON.stringify(allGames.map((g) => this._gameToViewJson(g, g.path))),
+		);
+		await this._setSimpleState(
+			`${infoPath}.byWeek`,
+			"Schedule events by week (JSON)",
+			"string",
+			"value.json",
+			JSON.stringify(byWeek),
+		);
 
 		await this._updateDiyViews(this._currentGames || [], favoriteTeamIds);
 		await this._pruneDisabledGameExtras();
-		this.log.info(`Schedule stored: ${allGames.length} events across ${weekFetches} week fetches (season ${seasonYear}).`);
+		this.log.info(
+			`Schedule stored (JSON only): ${allGames.length} events across ${weekFetches} week fetches (season ${seasonYear}).`,
+		);
+	}
+
+	/**
+	 * Deletes legacy `schedule/{year}/…` per-event trees that exceeded object limits.
+	 */
+	async _pruneLegacyScheduleTrees() {
+		const rootPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.`;
+		/** @type {Set<string>} */
+		const yearFolders = new Set();
+		try {
+			const objects = await this.getAdapterObjectsAsync();
+			for (const fullId of Object.keys(objects || {})) {
+				if (!fullId.startsWith(rootPrefix)) {
+					continue;
+				}
+				const top = fullId.slice(rootPrefix.length).split(".")[0];
+				if (top && /^\d{4}$/.test(top)) {
+					yearFolders.add(top);
+				}
+			}
+		} catch (error) {
+			this.log.warn(`Could not list objects to prune legacy schedule trees: ${error.message}`);
+			return;
+		}
+
+		for (const year of yearFolders) {
+			const rel = `${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.${year}`;
+			try {
+				await this.delObjectAsync(rel, { recursive: true });
+				this.log.info(`Removed legacy schedule tree ${rel} (JSON-only schedule storage).`);
+			} catch (error) {
+				this.log.warn(`Failed to remove legacy schedule tree ${rel}: ${error.message}`);
+			}
+		}
+	}
+
+	/**
+	 * Loads compact schedule games from `schedule.info.events` into memory if needed.
+	 */
+	async _hydrateScheduleGamesFromState() {
+		if (Array.isArray(this._scheduleGames) && this._scheduleGames.length) {
+			return;
+		}
+		try {
+			const st = await this.getStateAsync(
+				replaceForbiddenCharactersInObjectID(`${IOBROKER_OBJECT_ID__FOLDER__SCHEDULE}.info.events`),
+			);
+			if (!st || st.val == null || st.val === "") {
+				return;
+			}
+			const arr = JSON.parse(String(st.val));
+			if (!Array.isArray(arr)) {
+				return;
+			}
+			this._scheduleGames = arr.map((dto) => this._viewJsonToGameDto(dto)).filter(Boolean);
+		} catch (error) {
+			this.log.debug(`Could not hydrate schedule games from state: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Inverse of `_gameToViewJson` for in-memory merge / focus logic.
+	 * @param {object} dto
+	 * @returns {object|null}
+	 */
+	_viewJsonToGameDto(dto) {
+		if (!dto || !dto.id) {
+			return null;
+		}
+		const home = dto.home || {};
+		const away = dto.away || {};
+		return {
+			id: String(dto.id),
+			name: dto.name || "",
+			shortName: dto.shortName || "",
+			date: dto.date || "",
+			seasonYear: dto.seasonYear || 0,
+			seasonType: dto.seasonType || 0,
+			week: dto.week || 0,
+			path: dto.path || "",
+			broadcasts: dto.broadcasts || "",
+			attendance: dto.attendance || 0,
+			venue: typeof dto.venue === "string" ? { fullName: dto.venue } : dto.venue || {},
+			status: {
+				state: dto.status || "",
+				name: "",
+				detail: dto.detail || "",
+				shortDetail: "",
+				period: dto.period || 0,
+				displayClock: dto.clock || "",
+				completed: !!dto.completed,
+			},
+			home: {
+				teamId: String(home.id || ""),
+				abbreviation: home.abbr || "",
+				displayName: home.name || "",
+				score: home.score || "",
+				winner: !!home.winner,
+				isFavorite: !!home.isFavorite,
+			},
+			away: {
+				teamId: String(away.id || ""),
+				abbreviation: away.abbr || "",
+				displayName: away.name || "",
+				score: away.score || "",
+				winner: !!away.winner,
+				isFavorite: !!away.isFavorite,
+			},
+		};
 	}
 
 	/**
@@ -1867,6 +1932,7 @@ class Nfl extends utils.Adapter {
 	 * @param {Set<string>} favoriteTeamIds
 	 */
 	async _updateDiyViews(games, favoriteTeamIds) {
+		await this._hydrateScheduleGamesFromState();
 		const maxSlots = this._viewsTodayMaxSlots();
 		const todayKey = this._localDateKey(new Date().toISOString());
 		const sorted = games.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));

@@ -23,17 +23,17 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Enrich teams with division and venue data (including venue images) where available
 * Periodic scoreboard polling (ESPN CDN) writing `nfl-games.current.{eventId}.*` (live scores, clock, status, home/away, venue, broadcasts)
 * Season archive under `nfl-games.archive/all|{favorites}/{seasonYear}/…` with configurable retention (N seasons or unlimited)
-* Multi-week `schedule/{seasonYear}/type{N}/week{M}/{eventId}` (preseason / regular / postseason; slow poll)
+* Multi-week schedule as compact JSON under `schedule.info.events` / `byWeek` (preseason / regular / postseason; slow poll — not a per-event object tree)
 * Stable DIY datapoints under `views.*` (flat slots + optional JSON mirrors; `views.byTeam.{id}.focus` for every team; `views.favorites` only if favorites are configured)
 * Configurable live refresh interval (admin, default 30 s; auto 5 min when no games are live)
 * Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
-* **VIS-1 widget — NFL Scoreboard** (`tplNflScoreboard`): live/upcoming/all modes, favorite-filter, team logos (ESPN CDN), animated live indicator, dark-theme; auto-refreshes every 31 s
-* **VIS-1 widget — NFL Favorite Team** (`tplNflFavoriteTeam`): single-team card showing live score + clock, next game countdown, or last result
-* **VIS-1 widget — NFL Schedule** (`tplNflSchedule`): upcoming games from multi-week schedule (all or favorites); refreshes every 60 s
+* **VIS-1 widgets (Stadium Luxe)** — Scoreboard (`list`/`ticker`), Favorite Team (`hero`/`compact`/`strip`), Schedule; sidebar options for filters, layout, display toggles, and colors (defaults: deep blue / gold)
+* Optional: DIY binding to `views.*` without widgets
 
 ### Not implemented yet
 
-* VIS-2 widgets (optional future add-on)
+* VIS-2 native widgets (VIS-1 set is not drop-in compatible with `vis-2`)
+* Live drive situation fields (down/distance, ball on, last play) — mock-only until ESPN situation data is stored
 
 ## Requirements
 
@@ -54,7 +54,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 | **Favorite focus: show final (h)** | `24` | 0–168 | How long `views.byTeam.{id}.focus` stays on `final` before next upcoming. |
 | **Max today/live view slots** | `16` | 1–32 | Cap for numbered slots. Slots exist only while games fill them (no empty placeholders). |
 | **Also write JSON view mirrors** | on | — | Extra JSON states for scripts; flat states are always written. |
-| **Fetch multi-week schedule** | on | — | Builds `schedule/{year}/type{N}/week{M}/…` (pre/regular/post). |
+| **Fetch multi-week schedule** | on | — | Fills `schedule.info.events` / `byWeek` JSON (pre/regular/post). |
 | **Schedule refresh interval (h)** | `6` | 1–48 | Independent of live scoreboard poll. |
 | **Write venue / broadcasts / attendance / sourcePath** | on | — | Optional game extras; disabled fields are deleted on the next poll (including parent `venue` folders). |
 | **Team / logo / venue refresh (h)** | `24` | 0–168 | Re-fetch master data after startup. `24` = daily, `168` = weekly, `0` = startup only. |
@@ -70,11 +70,13 @@ Prefer stable views (paths do not move when a game is archived):
 * `nfl.0.views.favorites.*` — only present when at least one favorite team is set  
 
 Canonical week data: `nfl.0.nfl-games.current.{eventId}.*` (IDs change each week). Prefer `views.*` for DIY bindings.  
-Full season: `nfl.0.schedule.{year}.type{N}.week{M}.{eventId}.*`.
+Full season (JSON): `nfl.0.schedule.info.events` and `nfl.0.schedule.info.byWeek`. DIY/VIS bind to `views.*`, not the raw schedule states.
 
-## Data source
+## Limitations
 
-Unofficial ESPN site/core HTTP APIs (no API key). Endpoints and payloads can change without notice. This project is not affiliated with ESPN or the NFL.
+* Scoreboard week is whatever ESPN’s CDN returns for the current slate; multi-week coverage is via `schedule.info` JSON + `views.schedule.*`.
+* Enabling **Store logo base64** increases object count substantially; leave it off unless you need base64 in the object DB.
+* Default instance object limit (5 000) is usually enough with JSON schedule + base64 off; raise the instance limit in Admin if you still see a warning.
 
 ## Disclaimer
 
@@ -89,10 +91,12 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) VIS-1 Stadium Luxe restyle (Scoreboard / Favorite / Schedule) with expanded sidebar settings
+* (Daniel Drießen) Multi-week schedule as JSON-only (`schedule.info.events` / `byWeek`) to stay under instance object limits; prune legacy year trees
 * (Daniel Drießen) VIS-1 NFL Schedule widget (`tplNflSchedule`) + `views.schedule.upcoming` JSON
 * (Daniel Drießen) Daily team/logo/venue master-data refresh (admin interval; 0 = startup only)
 * (Daniel Drießen) Optional admin toggles for venue/broadcasts/attendance/sourcePath (prune when off)
-* (Daniel Drießen) Multi-week `schedule/` tree + richer game fields (venue/broadcasts) + view `sourcePath`
+* (Daniel Drießen) Multi-week schedule + richer game fields (venue/broadcasts) + view `sourcePath`
 * (Daniel Drießen) Games object model: `current/` + season archives + stable `views.*` (flat + JSON)
 * (Daniel Drießen) Fix favorite-team admin control: use `selectSendTo` (fresh team list on open; standard Save/Close toolbar)
 * (Daniel Drießen) VIS-1 widgets: NFL Scoreboard and Favorite Team card

@@ -1,17 +1,12 @@
 <!--
-	ioBroker.vis nfl Widget-Set
-
+	ioBroker.vis nfl Widget-Set — Stadium Luxe
 	version: "0.0.1"
-
 	Copyright 2024-2026 Daniel Drießen daniel.driessen@ddproductions.de
 -->
 <link rel="stylesheet" href="widgets/nfl/css/style.css" />
 <script type="text/javascript" src="widgets/nfl/js/nfl.js"></script>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     WIDGET 1 — NFL Scoreboard
-     Shows live, upcoming, or all NFL games with scores, clocks, and logos.
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- NFL Scoreboard — list or ticker -->
 <script id="tplNflScoreboard"
 	type="text/ejs"
 	class="vis-tpl"
@@ -19,25 +14,16 @@
 	data-vis-type="val"
 	data-vis-name="NFL Scoreboard"
 	data-vis-update-style="true"
-	data-vis-prev='<div style="background:#0d1117;border-radius:8px;padding:0;font-family:sans-serif;width:270px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #c8a94e28"><span style="color:#c8a94e;font-weight:700;font-size:13px;letter-spacing:.05em">🏈 NFL &nbsp;<span style="font-weight:400;font-size:11px;opacity:.65">Week 2  2026</span></span><span style="background:#c8a94e;color:#000;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,.6);display:inline-block"></span>2 LIVE</span></div><div style="padding:8px 14px;background:#161b22;border-bottom:1px solid #ffffff0a"><div style="color:#ff5555;font-size:10px;font-weight:600;letter-spacing:.05em;margin-bottom:5px">● Q2&nbsp;&nbsp;5:32</div><div style="display:flex;align-items:center;gap:8px;color:#e6edf3"><span style="font-size:13px;font-weight:700">PHI</span><div style="flex:1;display:flex;justify-content:center;gap:6px;align-items:center"><span style="font-size:18px;font-weight:700;color:#c8a94e">0</span><span style="color:#e6edf322">–</span><span style="font-size:18px;font-weight:700;color:#c8a94e">7</span></div><span style="font-size:13px;font-weight:700">BAL</span></div></div><div style="padding:8px 14px;border-bottom:1px solid #ffffff0a"><div style="color:#e6edf377;font-size:10px;margin-bottom:5px">Sun, Sep 8&nbsp;&nbsp;4:25 PM</div><div style="display:flex;align-items:center;gap:8px;color:#e6edf3"><span style="font-size:13px;font-weight:700">KC</span><div style="flex:1;display:flex;justify-content:center"><span style="font-size:13px;color:#e6edf344;font-style:italic">vs</span></div><span style="font-size:13px;font-weight:700">CLE</span></div></div></div>'
-	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_filter;mode[all]/nselect,all,live,upcoming;favoriteOnly/checkbox;maxGames[16]/number,1,50,1;group.nfl_group_style;showLogos[true]/checkbox;bgColor[#0d1117]/color;textColor[#e6edf3]/color;accentColor[#c8a94e]/color">
+	data-vis-prev='<div style="background:#0D1B2A;border-radius:14px;padding:0;font-family:sans-serif;width:280px;overflow:hidden;border:1px solid #ffffff14"><div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#ffffff1a"><span style="color:#FFD166;font-weight:700;font-size:12px;letter-spacing:.08em">NFL</span><span style="background:#ff3b5c2e;color:#ff8fa3;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700">● LIVE</span></div><div style="padding:10px 14px;border-bottom:1px solid #ffffff14"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:#ff8fa3;font-size:10px">Q2 5:32</span><span style="color:#c4b0ff;font-size:10px">LIVE</span></div><div style="display:flex;align-items:center;color:#F5F7FA;gap:8px"><span style="font-weight:700">PHI</span><div style="flex:1;text-align:center;color:#FFD166;font-size:20px;font-weight:800">0 – 7</div><span style="font-weight:700">BAL</span></div></div></div>'
+	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_filter;mode[all]/nselect,all,live,upcoming;favoriteOnly/checkbox;maxGames[16]/number,1,50,1;group.nfl_group_layout;layout[list]/nselect,list,ticker;density[comfortable]/nselect,comfortable,compact;group.nfl_group_display;showLogos[true]/checkbox;showHeader[true]/checkbox;showVenue[true]/checkbox;showBroadcasts/checkbox;group.nfl_group_style;bgColor[#0D1B2A]/color;textColor[#F5F7FA]/color;accentColor[#FFD166]/color">
 	<div class="vis-widget"
 		id="<%= this.data.attr('wid') %>"
 		style="width:100%;height:100%;overflow:hidden;box-sizing:border-box"><%
-		vis.binds['nfl'].createScoreboard(
-			this.data.wid,
-			this.view,
-			this.data,
-			this.style
-		);
+		vis.binds['nfl'].createScoreboard(this.data.wid, this.view, this.data, this.style);
 	%></div>
 </script>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     WIDGET 2 — NFL Favorite Team
-     Shows a single focused card for the configured favorite team:
-     live score (if playing), next game (if upcoming), or last result.
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- NFL Favorite Team — hero / compact / strip -->
 <script id="tplNflFavoriteTeam"
 	type="text/ejs"
 	class="vis-tpl"
@@ -45,24 +31,16 @@
 	data-vis-type="val"
 	data-vis-name="NFL Favorite Team"
 	data-vis-update-style="true"
-	data-vis-prev='<div style="background:#0d1117;border-radius:8px;padding:0;font-family:sans-serif;width:200px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #c8a94e28"><span style="color:#c8a94e;font-weight:700;font-size:13px">⭐ Pittsburgh Steelers</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:16px;gap:8px;color:#e6edf3"><img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/scoreboard/pit.png&amp;w=80&amp;h=80&amp;scale=crop" style="width:72px;height:72px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#e6edf355;text-transform:uppercase;margin-top:4px">NEXT GAME</div><div style="font-size:13px;font-weight:600;color:#c8a94e">Sun, Sep 8&nbsp;&nbsp;1:00 PM</div><div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px"><img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/scoreboard/cle.png&amp;w=28&amp;h=28&amp;scale=crop" style="width:24px;height:24px;object-fit:contain" onerror="this.style.display=\'none\'">vs Cleveland Browns</div></div></div>'
-	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_style;showLogos[true]/checkbox;bgColor[#0d1117]/color;textColor[#e6edf3]/color;accentColor[#c8a94e]/color">
+	data-vis-prev='<div style="background:#0D1B2A;border-radius:14px;padding:0;font-family:sans-serif;width:260px;overflow:hidden;border:1px solid #ffffff14"><div style="display:flex;justify-content:space-between;padding:12px 14px;background:#ffffff1a"><span style="color:#FFD166;font-weight:700;font-size:12px">Baltimore Ravens</span><span style="background:#ff3b5c2e;color:#ff8fa3;padding:3px 10px;border-radius:999px;font-size:10px">LIVE</span></div><div style="display:flex;justify-content:space-around;align-items:center;padding:18px 12px;color:#F5F7FA"><div style="text-align:center"><div style="font-weight:800">BAL</div></div><div style="font-size:36px;font-weight:800;color:#FFD166">24 – 17</div><div style="text-align:center"><div style="font-weight:800">CIN</div></div></div></div>'
+	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_layout;layout[hero]/nselect,hero,compact,strip;group.nfl_group_display;showLogos[true]/checkbox;showNextFooter[true]/checkbox;showStatsRow[true]/checkbox;showVenue[true]/checkbox;showBroadcasts[true]/checkbox;group.nfl_group_style;bgColor[#0D1B2A]/color;textColor[#F5F7FA]/color;accentColor[#FFD166]/color">
 	<div class="vis-widget"
 		id="<%= this.data.attr('wid') %>"
 		style="width:100%;height:100%;overflow:hidden;box-sizing:border-box"><%
-		vis.binds['nfl'].createFavoriteTeam(
-			this.data.wid,
-			this.view,
-			this.data,
-			this.style
-		);
+		vis.binds['nfl'].createFavoriteTeam(this.data.wid, this.view, this.data, this.style);
 	%></div>
 </script>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     WIDGET 3 — NFL Schedule
-     Upcoming games from multi-week schedule (views.schedule.* JSON).
-     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- NFL Schedule — upcoming list -->
 <script id="tplNflSchedule"
 	type="text/ejs"
 	class="vis-tpl"
@@ -70,16 +48,11 @@
 	data-vis-type="val"
 	data-vis-name="NFL Schedule"
 	data-vis-update-style="true"
-	data-vis-prev='<div style="background:#0d1117;border-radius:8px;padding:0;font-family:sans-serif;width:270px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #c8a94e28"><span style="color:#c8a94e;font-weight:700;font-size:13px;letter-spacing:.05em">📅 NFL SCHEDULE</span><span style="font-size:11px;opacity:.65;color:#e6edf3">3 games</span></div><div style="padding:8px 14px;border-bottom:1px solid #ffffff0a"><div style="color:#e6edf377;font-size:10px;margin-bottom:5px">Sun, Sep 7&nbsp;&nbsp;1:00 PM</div><div style="display:flex;align-items:center;gap:8px;color:#e6edf3"><span style="font-size:13px;font-weight:700">PIT</span><div style="flex:1;display:flex;justify-content:center"><span style="font-size:13px;color:#e6edf344;font-style:italic">vs</span></div><span style="font-size:13px;font-weight:700">NYJ</span></div></div></div>'
-	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_filter;scheduleMode[upcoming]/nselect,upcoming,favorites;maxGames[12]/number,1,32,1;group.nfl_group_style;showLogos[true]/checkbox;bgColor[#0d1117]/color;textColor[#e6edf3]/color;accentColor[#c8a94e]/color">
+	data-vis-prev='<div style="background:#0D1B2A;border-radius:14px;padding:0;font-family:sans-serif;width:300px;overflow:hidden;border:1px solid #ffffff14"><div style="display:flex;justify-content:space-between;padding:12px 14px;background:#ffffff1a"><span style="color:#FFD166;font-weight:700;font-size:12px">NFL SCHEDULE</span><span style="opacity:.65;color:#F5F7FA;font-size:11px">3 games</span></div><div style="display:flex;gap:12px;padding:12px 14px;align-items:center;border-bottom:1px solid #ffffff14"><div style="width:78px;font-size:10px;color:#ffffff88"><strong style="color:#F5F7FA;display:block">Sun Nov 24</strong>8:20 PM</div><div style="flex:1;font-weight:700;color:#F5F7FA">PIT vs NYJ</div><span style="background:#6c2eff38;color:#c4b0ff;padding:3px 10px;border-radius:999px;font-size:10px">UPCOMING</span></div></div>'
+	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_filter;scheduleMode[upcoming]/nselect,upcoming,favorites;maxGames[12]/number,1,32,1;group.nfl_group_layout;density[comfortable]/nselect,comfortable,compact;group.nfl_group_display;showLogos[true]/checkbox;showHeader[true]/checkbox;showVenue[true]/checkbox;group.nfl_group_style;bgColor[#0D1B2A]/color;textColor[#F5F7FA]/color;accentColor[#FFD166]/color">
 	<div class="vis-widget"
 		id="<%= this.data.attr('wid') %>"
 		style="width:100%;height:100%;overflow:hidden;box-sizing:border-box"><%
-		vis.binds['nfl'].createSchedule(
-			this.data.wid,
-			this.view,
-			this.data,
-			this.style
-		);
+		vis.binds['nfl'].createSchedule(this.data.wid, this.view, this.data, this.style);
 	%></div>
 </script>

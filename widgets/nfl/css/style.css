@@ -1,14 +1,34 @@
 /*
-	ioBroker.vis nfl Widget-Set — Styles
+	ioBroker.vis nfl Widget-Set — Stadium Luxe
 	Copyright 2024-2026 Daniel Drießen daniel.driessen@ddproductions.de
+
+	Design tokens inspired by the private Stadium Luxe concept
+	(Resources/UI/stadium-luxe-concept.png). Defaults match the mock;
+	all colors remain overridable via VIS sidebar attrs.
 */
 
-/* ── Shared base ────────────────────────────────────────────────────────────── */
+:root {
+	--nfl-deep: #0d1b2a;
+	--nfl-glass: rgba(255, 255, 255, 0.1);
+	--nfl-gold: #ffd166;
+	--nfl-teal: #00e0c6;
+	--nfl-purple: #6c2eff;
+	--nfl-orange: #ff8a00;
+	--nfl-live: #ff3b5c;
+	--nfl-text: #f5f7fa;
+	--nfl-muted: rgba(245, 247, 250, 0.55);
+	--nfl-line: rgba(255, 255, 255, 0.08);
+	--nfl-radius: 14px;
+	--nfl-font: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
 
 .nfl-sb,
-.nfl-ft {
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-	border-radius: 8px;
+.nfl-ft,
+.nfl-sch,
+.nfl-ticker,
+.nfl-strip {
+	font-family: var(--nfl-font);
+	border-radius: var(--nfl-radius);
 	overflow: hidden;
 	height: 100%;
 	width: 100%;
@@ -16,8 +36,15 @@
 	display: flex;
 	flex-direction: column;
 	font-size: 13px;
-	line-height: 1.4;
+	line-height: 1.35;
 	-webkit-font-smoothing: antialiased;
+	background:
+		radial-gradient(120% 80% at 50% -10%, rgba(108, 46, 255, 0.18), transparent 55%),
+		radial-gradient(90% 60% at 100% 100%, rgba(255, 138, 0, 0.08), transparent 50%),
+		var(--nfl-deep);
+	color: var(--nfl-text);
+	border: 1px solid var(--nfl-line);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .nfl-dim {
@@ -26,68 +53,102 @@
 }
 
 .nfl-empty {
-	padding: 20px 16px;
+	padding: 22px 16px;
 	text-align: center;
 	line-height: 1.6;
+	color: var(--nfl-muted);
 }
 
-/* ── Live badge (header) ────────────────────────────────────────────────────── */
+/* ── Badges ─────────────────────────────────────────────────────────────────── */
 
-.nfl-live-badge {
+.nfl-badge {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
-	padding: 2px 9px 2px 6px;
-	border-radius: 12px;
+	padding: 3px 10px 3px 8px;
+	border-radius: 999px;
 	font-size: 10px;
 	font-weight: 700;
-	letter-spacing: 0.07em;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
 	flex-shrink: 0;
+	border: 1px solid transparent;
 }
 
-/* Animated pulsing dot (used in badge) */
-.nfl-dot-anim {
-	display: inline-block;
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: rgba(0, 0, 0, 0.65);
-	animation: nfl-pulse 1.4s ease-in-out infinite;
-	flex-shrink: 0;
+.nfl-badge-live {
+	background: rgba(255, 59, 92, 0.18);
+	color: #ff8fa3;
+	border-color: rgba(255, 59, 92, 0.45);
 }
 
-/* Red dot for live game row status line */
+.nfl-badge-upcoming {
+	background: rgba(108, 46, 255, 0.22);
+	color: #c4b0ff;
+	border-color: rgba(108, 46, 255, 0.5);
+}
+
+.nfl-badge-final {
+	background: rgba(255, 255, 255, 0.08);
+	color: rgba(245, 247, 250, 0.7);
+	border-color: rgba(255, 255, 255, 0.12);
+}
+
+.nfl-badge-ot {
+	background: rgba(255, 138, 0, 0.2);
+	color: #ffb86a;
+	border-color: rgba(255, 138, 0, 0.45);
+}
+
+.nfl-badge-ht {
+	background: rgba(0, 224, 198, 0.15);
+	color: var(--nfl-teal);
+	border-color: rgba(0, 224, 198, 0.4);
+}
+
+.nfl-dot-anim,
 .nfl-dot-red {
 	display: inline-block;
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	background: #ff5555;
-	animation: nfl-pulse 1.4s ease-in-out infinite;
 	flex-shrink: 0;
+	animation: nfl-pulse 1.4s ease-in-out infinite;
+}
+
+.nfl-dot-anim {
+	background: currentColor;
+}
+
+.nfl-dot-red {
+	background: var(--nfl-live);
 }
 
 @keyframes nfl-pulse {
 	0%,
 	100% { opacity: 1; }
-	50%   { opacity: 0.3; }
+	50% { opacity: 0.35; }
 }
 
-/* ── NFL Scoreboard widget ──────────────────────────────────────────────────── */
+/* ── Headers ────────────────────────────────────────────────────────────────── */
 
-.nfl-sb-hdr {
+.nfl-sb-hdr,
+.nfl-ft-hdr {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	padding: 10px 14px;
+	padding: 12px 14px;
 	flex-shrink: 0;
+	background: var(--nfl-glass);
+	border-bottom: 1px solid var(--nfl-line);
+	backdrop-filter: blur(8px);
 }
 
 .nfl-sb-title {
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 700;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.08em;
 	text-transform: uppercase;
+	color: var(--nfl-gold);
 }
 
 .nfl-sb-list {
@@ -95,10 +156,12 @@
 	flex: 1;
 }
 
-/* One game row */
+/* ── Scoreboard / schedule rows ─────────────────────────────────────────────── */
+
 .nfl-row {
-	padding: 8px 14px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--nfl-line);
+	background: transparent;
 	transition: background 0.15s;
 }
 
@@ -106,34 +169,43 @@
 	border-bottom: none;
 }
 
-/* Status line (FINAL / Q2 5:32 / date) */
+.nfl-row-live {
+	background: linear-gradient(90deg, rgba(255, 59, 92, 0.08), transparent 60%);
+}
+
 .nfl-row-status {
 	font-size: 10px;
 	font-weight: 600;
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
-	margin-bottom: 5px;
+	margin-bottom: 6px;
 	min-height: 14px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	color: var(--nfl-muted);
 }
 
 .nfl-live-line {
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
+	color: #ff8fa3;
 }
 
-/* Teams + score row */
 .nfl-row-teams {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 }
 
 .nfl-team {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	flex: 1;
+	min-width: 0;
 }
 
 .nfl-team-r {
@@ -141,150 +213,397 @@
 }
 
 .nfl-logo {
-	width: 32px;
-	height: 32px;
+	width: 34px;
+	height: 34px;
 	object-fit: contain;
 	flex-shrink: 0;
+	filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
 }
 
 .nfl-abbr {
 	font-size: 13px;
 	font-weight: 700;
-	letter-spacing: 0.03em;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
 }
 
-/* Score block (centered between teams) */
 .nfl-score-blk {
 	display: flex;
 	align-items: center;
-	gap: 5px;
-	min-width: 72px;
+	gap: 6px;
+	min-width: 76px;
 	justify-content: center;
 	flex-shrink: 0;
 }
 
 .nfl-score {
-	font-size: 18px;
-	font-weight: 700;
-	min-width: 22px;
+	font-size: 20px;
+	font-weight: 800;
+	min-width: 24px;
 	text-align: center;
 	line-height: 1;
+	color: var(--nfl-gold);
 }
 
-/* Winner gets a subtle glow */
 .nfl-win {
-	text-shadow: 0 0 10px currentColor;
+	text-shadow: 0 0 12px rgba(255, 209, 102, 0.55);
 }
 
 .nfl-sep {
-	font-size: 13px;
+	font-size: 14px;
+	opacity: 0.35;
 }
 
 .nfl-vs {
 	font-size: 12px;
 	font-style: italic;
+	opacity: 0.45;
 }
 
-/* ── NFL Favorite Team widget ───────────────────────────────────────────────── */
+.nfl-row-meta {
+	margin-top: 6px;
+	font-size: 10px;
+	color: var(--nfl-muted);
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 
-.nfl-ft-hdr {
+.nfl-compact .nfl-row {
+	padding: 7px 12px;
+}
+
+.nfl-compact .nfl-logo {
+	width: 28px;
+	height: 28px;
+}
+
+.nfl-compact .nfl-score {
+	font-size: 16px;
+}
+
+/* ── Ticker layout ──────────────────────────────────────────────────────────── */
+
+.nfl-ticker-track {
 	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 10px 16px;
-	font-size: 13px;
-	flex-shrink: 0;
+	flex-direction: column;
+	gap: 0;
+	overflow-y: auto;
+	flex: 1;
 }
+
+.nfl-ticker-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--nfl-line);
+	min-height: 40px;
+}
+
+.nfl-ticker-item:last-child {
+	border-bottom: none;
+}
+
+.nfl-ticker-scores {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 800;
+	color: var(--nfl-gold);
+	font-size: 15px;
+	min-width: 64px;
+	justify-content: center;
+}
+
+.nfl-ticker-clock {
+	margin-left: auto;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	color: #ff8fa3;
+	text-transform: uppercase;
+}
+
+/* ── Favorite Team — hero ───────────────────────────────────────────────────── */
 
 .nfl-ft-body {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	padding: 14px 16px 18px;
-	gap: 10px;
+	align-items: stretch;
+	padding: 14px 16px 12px;
+	gap: 12px;
 	flex: 1;
+	min-height: 0;
 }
 
-/* My team logo */
-.nfl-ft-logo-wrap {
-	margin: 4px 0 6px;
-}
-
-.nfl-ft-logo {
-	width: 80px;
-	height: 80px;
-	object-fit: contain;
-	display: block;
-}
-
-/* Small label above scores ("FINAL" / "NEXT GAME" etc.) */
-.nfl-ft-label {
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
-}
-
-/* Period / clock line when live */
-.nfl-ft-clock {
-	font-size: 12px;
-	font-weight: 700;
-	letter-spacing: 0.07em;
-	text-transform: uppercase;
-}
-
-/* Score block */
-.nfl-ft-scores {
+.nfl-ft-match {
 	display: flex;
 	align-items: center;
-	gap: 14px;
+	justify-content: space-between;
+	gap: 10px;
 }
 
 .nfl-ft-side {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 2px;
+	gap: 6px;
+	flex: 1;
+	min-width: 0;
+}
+
+.nfl-ft-logo {
+	width: 72px;
+	height: 72px;
+	object-fit: contain;
+	filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.5));
+}
+
+.nfl-ft-compact .nfl-ft-logo {
+	width: 48px;
+	height: 48px;
 }
 
 .nfl-ft-abbr {
+	font-size: 12px;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+}
+
+.nfl-ft-record {
 	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.09em;
-	text-transform: uppercase;
+	color: var(--nfl-muted);
+}
+
+.nfl-ft-score-center {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	flex-shrink: 0;
+	min-width: 88px;
+}
+
+.nfl-ft-scores {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
 }
 
 .nfl-ft-big {
-	font-size: 40px;
+	font-size: 42px;
 	font-weight: 800;
 	line-height: 1;
+	color: var(--nfl-gold);
+	letter-spacing: -0.02em;
+}
+
+.nfl-ft-compact .nfl-ft-big {
+	font-size: 28px;
 }
 
 .nfl-ft-dash {
-	font-size: 26px;
+	font-size: 22px;
 	font-weight: 200;
-	line-height: 1;
-	margin-top: 16px; /* align with number baseline */
+	opacity: 0.35;
 }
 
-/* Opponent line */
-.nfl-ft-opp {
+.nfl-ft-clock {
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--nfl-muted);
+}
+
+.nfl-ft-poss {
+	height: 3px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.08);
+	overflow: hidden;
+	margin: 0 4px;
+}
+
+.nfl-ft-poss > span {
+	display: block;
+	height: 100%;
+	width: 42%;
+	border-radius: 2px;
+	background: linear-gradient(90deg, var(--nfl-orange), #ffb86a);
+	box-shadow: 0 0 10px rgba(255, 138, 0, 0.55);
+}
+
+.nfl-ft-poss-home > span {
+	margin-left: auto;
+}
+
+.nfl-ft-poss-away > span {
+	margin-right: auto;
+}
+
+.nfl-ft-stats {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+	padding: 10px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid var(--nfl-line);
+}
+
+.nfl-ft-stat {
+	text-align: center;
+	min-width: 0;
+}
+
+.nfl-ft-stat-label {
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--nfl-muted);
+	margin-bottom: 4px;
+}
+
+.nfl-ft-stat-val {
+	font-size: 11px;
+	font-weight: 700;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--nfl-text);
+}
+
+.nfl-ft-footer {
+	margin-top: auto;
+	padding: 10px 12px;
+	border-top: 1px solid var(--nfl-line);
+	background: rgba(0, 0, 0, 0.22);
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	font-size: 13px;
+	gap: 10px;
 }
 
-.nfl-ft-opp-logo {
-	width: 24px;
-	height: 24px;
+.nfl-ft-footer-label {
+	font-size: 9px;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--nfl-gold);
+	flex-shrink: 0;
+}
+
+.nfl-ft-footer-body {
+	flex: 1;
+	min-width: 0;
+	font-size: 11px;
+	color: var(--nfl-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.nfl-ft-footer-opp {
+	width: 22px;
+	height: 22px;
 	object-fit: contain;
 	flex-shrink: 0;
 }
 
-/* Upcoming date */
-.nfl-ft-date {
+/* ── Favorite strip (tiny) ──────────────────────────────────────────────────── */
+
+.nfl-strip {
+	flex-direction: row;
+	align-items: center;
+	padding: 0 12px;
+	gap: 10px;
+	border-radius: 10px;
+}
+
+.nfl-strip-heart {
+	color: var(--nfl-gold);
 	font-size: 14px;
-	font-weight: 600;
-	letter-spacing: 0.01em;
+	flex-shrink: 0;
+}
+
+.nfl-strip-mid {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+
+.nfl-strip-score {
+	font-weight: 800;
+	color: var(--nfl-gold);
+	font-size: 15px;
+	letter-spacing: 0.02em;
+}
+
+.nfl-strip-meta {
+	margin-left: auto;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: #ff8fa3;
+	flex-shrink: 0;
+}
+
+/* ── Schedule list (upcoming emphasis) ──────────────────────────────────────── */
+
+.nfl-sch-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--nfl-line);
+}
+
+.nfl-sch-row:last-child {
+	border-bottom: none;
+}
+
+.nfl-sch-when {
+	flex-shrink: 0;
+	width: 78px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--nfl-muted);
+	line-height: 1.35;
+}
+
+.nfl-sch-when strong {
+	display: block;
+	color: var(--nfl-text);
+	font-size: 11px;
+	margin-bottom: 2px;
+}
+
+.nfl-sch-match {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.nfl-sch-teams {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 700;
+}
+
+.nfl-sch-venue {
+	font-size: 10px;
+	color: var(--nfl-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
