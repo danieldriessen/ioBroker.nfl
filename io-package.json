@@ -92,6 +92,11 @@
 		"writeViewJson": true,
 		"scheduleEnabled": true,
 		"schedulePollIntervalHours": 6,
+		"writeGameVenue": true,
+		"writeGameBroadcasts": true,
+		"writeGameAttendance": true,
+		"writeGameSourcePath": true,
+		"teamDataRefreshIntervalHours": 24,
 		"writeLogoBase64": false
 	},
 	"objects": [],

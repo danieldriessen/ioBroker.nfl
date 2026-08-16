@@ -27,7 +27,18 @@
 	"scheduleEnabled_help": "Baut schedule/{seasonYear}/type{N}/week{M}/{eventId} aus ESPN (Preseason, Regular, Postseason). Wird für byTeam-Focus und nächstes Favoriten-Spiel jenseits der aktuellen Scoreboard-Woche genutzt.",
 	"schedulePollIntervalHours": "Spielplan-Aktualisierung (Stunden)",
 	"schedulePollIntervalHours_help": "Wie oft der volle Mehrwochen-Spielplan aktualisiert wird (1–48 h). Unabhängig vom Live-Scoreboard-Intervall.",
+	"game_extras_header": "Optionale Spielfelder",
+	"writeGameVenue": "Venue (Stadion) schreiben",
+	"writeGameVenue_help": "Legt unter jedem Spiel einen Venue-Kanal an (Name, Stadt, Staat, Indoor). Wenn deaktiviert, werden vorhandene Venue-Ordner beim nächsten Poll entfernt.",
+	"writeGameBroadcasts": "Broadcasts schreiben",
+	"writeGameBroadcasts_help": "Schreibt einen Broadcasts-String je Spiel. Wenn deaktiviert, wird der State beim nächsten Poll entfernt.",
+	"writeGameAttendance": "Zuschauerzahl schreiben",
+	"writeGameAttendance_help": "Schreibt Attendance, wenn ESPN sie liefert. Wenn deaktiviert, wird der State beim nächsten Poll entfernt.",
+	"writeGameSourcePath": "sourcePath schreiben",
+	"writeGameSourcePath_help": "Schreibt sourcePath auf das kanonische Spielobjekt (hilfreich für DIY). Wenn deaktiviert, wird der State beim nächsten Poll entfernt.",
 	"storage_header": "Bildspeicher",
+	"teamDataRefreshIntervalHours": "Team-/Logo-/Venue-Aktualisierung (Stunden)",
+	"teamDataRefreshIntervalHours_help": "Wie oft Teams, Logos, Divisions und Venues nach dem Start erneut geholt werden (0–168). Standard 24 = täglich. 168 = wöchentlich. 0 = nur beim Adapter-Start.",
 	"writeLogoBase64": "Logo-Base64 in Objekten speichern",
 	"writeLogoBase64_help": "Standardmäßig aus (empfohlen). Logos bleiben als Dateien im Adapter-Namespace; VIS-Widgets nutzen ESPN-CDN-URLs. Nur aktivieren, wenn du Base64/Icons im Objektbaum brauchst."
 }

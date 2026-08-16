@@ -27,7 +27,18 @@
 	"scheduleEnabled_help": "When enabled, builds schedule/{seasonYear}/type{N}/week{M}/{eventId} from ESPN (preseason, regular, postseason). Used for byTeam focus and next-favorite beyond the live scoreboard week.",
 	"schedulePollIntervalHours": "Schedule refresh interval (hours)",
 	"schedulePollIntervalHours_help": "How often to refresh the full multi-week schedule (1–48 h). Independent of the live scoreboard poll.",
+	"game_extras_header": "Optional game fields",
+	"writeGameVenue": "Write venue (stadium)",
+	"writeGameVenue_help": "Adds a venue channel (name, city, state, indoor) under each game. When disabled, existing venue folders are removed on the next poll.",
+	"writeGameBroadcasts": "Write broadcasts",
+	"writeGameBroadcasts_help": "Adds a broadcasts string on each game. When disabled, the state is removed on the next poll.",
+	"writeGameAttendance": "Write attendance",
+	"writeGameAttendance_help": "Adds attendance when ESPN provides it. When disabled, the state is removed on the next poll.",
+	"writeGameSourcePath": "Write sourcePath",
+	"writeGameSourcePath_help": "Adds sourcePath pointing at the canonical game object (useful for DIY). When disabled, the state is removed on the next poll.",
 	"storage_header": "Image storage",
+	"teamDataRefreshIntervalHours": "Team / logo / venue refresh (hours)",
+	"teamDataRefreshIntervalHours_help": "How often to re-fetch NFL teams, logos, divisions, and venues after startup (0–168). Default 24 = daily. Use 168 for weekly. 0 = only refresh when the adapter starts.",
 	"writeLogoBase64": "Store logo base64 in objects",
 	"writeLogoBase64_help": "Off by default (recommended). Logos stay as files under the adapter namespace; VIS widgets use ESPN CDN URLs. Enable only if you need base64/icon data in the object tree."
 }

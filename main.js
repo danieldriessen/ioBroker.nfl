@@ -197,6 +197,10 @@ class Nfl extends utils.Adapter {
 		this._scoreboardTimer = null;
 		/** @type {ReturnType<typeof setTimeout>|null} */
 		this._scheduleTimer = null;
+		/** @type {ReturnType<typeof setTimeout>|null} */
+		this._teamDataTimer = null;
+		/** @type {boolean} */
+		this._teamDataRefreshInProgress = false;
 		/** @type {object[]} Last scoreboard-week games (for views merge) */
 		this._currentGames = [];
 		/** @type {object[]} Multi-week schedule games (for focus / next favorite) */
@@ -213,64 +217,56 @@ class Nfl extends utils.Adapter {
 		// Reset the connection indicator during startup (to 'false')
 		this.setState("info.connection", false, true);
 
-		// Get basic data for NFL-Teams
 		try {
-			this.nflTeams = await this.get_basicData_NFLTeams();
+			await this.refreshTeamMasterData({ reason: "startup" });
 		} catch (error) {
-			// TODO: Figure out what to do here besides just logging the error and returning. Maybe schedule another try or just set the connection state to false.
 			this.log.error(error.message);
 			return;
-		}
-
-		// Download and Store NFL-Team logo-images for all found NFL-Teams
-		try {
-			await this.downloadAndStore_NFLTeam_LogoImages(this.nflTeams);
-		} catch (error) {
-			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
-			this.log.error(error.message);
-			return;
-		}
-
-		// Get additional data for NFL-Teams
-		try {
-			await this.get_additionalData_NFLTeams(this.nflTeams, this.nflDivisions, this.nflVenues);
-		} catch (error) {
-			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
-			this.log.error(error.message);
-			return;
-		}
-
-		// Download and Store NFL-Venue images for all found NFL-Venues (associated with existing NFL-Teams)
-		try {
-			await this.downloadAndStore_NFLVenue_Images(this.nflVenues);
-		} catch (error) {
-			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
-			this.log.error(error.message);
-			return;
-		}
-
-		// Store NFL-Teams to object structure
-		try {
-			await this.createObjectStructure_NFLTeams(this.nflTeams);
-		} catch (error) {
-			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
-			this.log.error(error.message);
-			return;
-		}
-
-		// Drop logo/venue files that are no longer referenced (slug leftovers, renamed assets)
-		try {
-			await this._pruneOrphanImageFiles();
-		} catch (error) {
-			this.log.warn(`Image orphan cleanup failed: ${error.message}`);
 		}
 
 		// Initialization completed successfully
 		await this.setStateAsync("info.connection", true, true);
 
-		// Start scoreboard + multi-week schedule polling loops
+		// Start scoreboard + multi-week schedule + team master-data refresh loops
 		this._startScoreboardLoop();
 		this._startScheduleLoop();
+		this._startTeamDataRefreshLoop();
+	}
+
+	/**
+	 * Full refresh of teams, logos, division/venue metadata, venue images, and object tree.
+	 * Used at startup and on the slow periodic team-data timer.
+	 * @param {{reason?: string}} [opts]
+	 */
+	async refreshTeamMasterData(opts = {}) {
+		const reason = opts.reason || "refresh";
+		if (this._teamDataRefreshInProgress) {
+			this.log.warn(`Team master-data refresh skipped (${reason}): already in progress.`);
+			return;
+		}
+		this._teamDataRefreshInProgress = true;
+		this.log.info(`Refreshing NFL team master data (${reason})…`);
+		try {
+			this.nflDivisions = [];
+			this.nflVenues = [];
+			this.nflDivisionSeasonYear = null;
+
+			this.nflTeams = await this.get_basicData_NFLTeams();
+			await this.downloadAndStore_NFLTeam_LogoImages(this.nflTeams);
+			await this.get_additionalData_NFLTeams(this.nflTeams, this.nflDivisions, this.nflVenues);
+			await this.downloadAndStore_NFLVenue_Images(this.nflVenues);
+			await this.createObjectStructure_NFLTeams(this.nflTeams);
+			try {
+				await this._pruneOrphanImageFiles();
+			} catch (error) {
+				this.log.warn(`Image orphan cleanup failed: ${error.message}`);
+			}
+			this.log.info(
+				`Team master data refresh done (${reason}): ${this.nflTeams.length} teams, ${this.nflVenues.length} venues.`,
+			);
+		} finally {
+			this._teamDataRefreshInProgress = false;
+		}
 	}
 
 	/**************************************************************************************************************************************
@@ -764,24 +760,151 @@ class Nfl extends utils.Adapter {
 		return Math.min(32, Math.max(1, Math.floor(raw)));
 	}
 
+	/**
+	 * Coerces admin checkbox / CLI values to boolean (handles string "false" from `iobroker object set`).
+	 * @param {unknown} val
+	 * @param {boolean} defaultValue
+	 * @returns {boolean}
+	 */
+	_configFlag(val, defaultValue) {
+		if (val === undefined || val === null || val === "") {
+			return defaultValue;
+		}
+		if (typeof val === "string") {
+			const s = val.trim().toLowerCase();
+			if (["false", "0", "off", "no"].includes(s)) {
+				return false;
+			}
+			if (["true", "1", "on", "yes"].includes(s)) {
+				return true;
+			}
+		}
+		if (val === false || val === 0) {
+			return false;
+		}
+		if (val === true || val === 1) {
+			return true;
+		}
+		return Boolean(val);
+	}
+
 	/** @returns {boolean} */
 	_writeViewJson() {
-		return this.config.writeViewJson !== false;
+		return this._configFlag(this.config.writeViewJson, true);
 	}
 
 	/** @returns {boolean} */
 	_archiveAllGamesEnabled() {
-		return this.config.archiveAllGames !== false;
+		return this._configFlag(this.config.archiveAllGames, true);
 	}
 
 	/** @returns {boolean} */
 	_archiveFavoriteGamesEnabled() {
-		return this.config.archiveFavoriteGames !== false;
+		return this._configFlag(this.config.archiveFavoriteGames, true);
 	}
 
 	/** @returns {boolean} */
 	_scheduleEnabled() {
-		return this.config.scheduleEnabled !== false;
+		return this._configFlag(this.config.scheduleEnabled, true);
+	}
+
+	/** @returns {boolean} */
+	_writeGameVenue() {
+		return this._configFlag(this.config.writeGameVenue, true);
+	}
+
+	/** @returns {boolean} */
+	_writeGameBroadcasts() {
+		return this._configFlag(this.config.writeGameBroadcasts, true);
+	}
+
+	/** @returns {boolean} */
+	_writeGameAttendance() {
+		return this._configFlag(this.config.writeGameAttendance, true);
+	}
+
+	/** @returns {boolean} */
+	_writeGameSourcePath() {
+		return this._configFlag(this.config.writeGameSourcePath, true);
+	}
+
+	/**
+	 * Deletes a relative object id if it exists (recursive optional).
+	 * @param {string} relativeId
+	 * @param {boolean} [recursive]
+	 */
+	async _deleteObjectIfExists(relativeId, recursive = false) {
+		try {
+			const id = replaceForbiddenCharactersInObjectID(relativeId);
+			if (recursive) {
+				await this.delObjectAsync(id, { recursive: true });
+			} else {
+				await this.delObjectAsync(id);
+			}
+		} catch (_e) {
+			// missing is fine
+		}
+	}
+
+	/**
+	 * Removes optional game extras that the user disabled (across current/archive/schedule/views).
+	 * Called after scoreboard/schedule writes so deselected fields do not linger.
+	 */
+	async _pruneDisabledGameExtras() {
+		const wantVenue = this._writeGameVenue();
+		const wantBroadcasts = this._writeGameBroadcasts();
+		const wantAttendance = this._writeGameAttendance();
+		const wantSourcePath = this._writeGameSourcePath();
+		if (wantVenue && wantBroadcasts && wantAttendance && wantSourcePath) {
+			return;
+		}
+
+		let objects;
+		try {
+			objects = await this.getAdapterObjectsAsync();
+		} catch (error) {
+			this.log.warn(`Could not list objects to prune game extras: ${error.message}`);
+			return;
+		}
+
+		const prefix = `${this.namespace}.`;
+		/** @type {Set<string>} */
+		const venueRoots = new Set();
+		/** @type {string[]} */
+		const stateLeaves = [];
+
+		for (const fullId of Object.keys(objects || {})) {
+			if (!fullId.startsWith(prefix)) {
+				continue;
+			}
+			const rel = fullId.slice(prefix.length);
+			const obj = objects[fullId];
+			if (!wantVenue && rel.endsWith(".venue") && obj?.type === "channel") {
+				venueRoots.add(rel);
+			}
+			if (!wantBroadcasts && rel.endsWith(".broadcasts") && obj?.type === "state") {
+				stateLeaves.push(rel);
+			}
+			if (!wantAttendance && rel.endsWith(".attendance") && obj?.type === "state") {
+				stateLeaves.push(rel);
+			}
+			if (!wantSourcePath && rel.endsWith(".sourcePath") && obj?.type === "state") {
+				stateLeaves.push(rel);
+			}
+		}
+
+		for (const rel of venueRoots) {
+			await this._deleteObjectIfExists(rel, true);
+		}
+		for (const rel of stateLeaves) {
+			await this._deleteObjectIfExists(rel, false);
+		}
+
+		if (venueRoots.size || stateLeaves.length) {
+			this.log.info(
+				`Pruned disabled game extras: ${venueRoots.size} venue folder(s), ${stateLeaves.length} state(s).`,
+			);
+		}
 	}
 
 	/** @returns {number} schedule poll interval in ms */
@@ -799,26 +922,15 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
-	 * Kicks off the first scoreboard fetch and schedules subsequent ones.
-	 * Uses a recursive setTimeout so polls never overlap.
+	 * Hours between team/logo/venue master-data refreshes. `0` = disabled (startup only).
+	 * @returns {number}
 	 */
-	_startScoreboardLoop() {
-		const tick = async () => {
-			if (this._scoreboardTimer === null) {
-				return; // adapter was unloaded
-			}
-			let nextMs = SCOREBOARD_POLL_INTERVAL_IDLE_MS;
-			try {
-				const hasLive = await this.fetchAndStoreScoreboard();
-				nextMs = hasLive ? this._livePollIntervalMs() : SCOREBOARD_POLL_INTERVAL_IDLE_MS;
-			} catch (error) {
-				this.log.error(`Scoreboard poll failed: ${error.message}`);
-			}
-			if (this._scoreboardTimer !== null) {
-				this._scoreboardTimer = setTimeout(tick, nextMs);
-			}
-		};
-		this._scoreboardTimer = setTimeout(tick, 0);
+	_teamDataRefreshIntervalHours() {
+		const raw = Number(this.config.teamDataRefreshIntervalHours);
+		if (!Number.isFinite(raw) || raw < 0) {
+			return 24;
+		}
+		return Math.min(168, Math.floor(raw));
 	}
 
 	/**
@@ -844,6 +956,56 @@ class Nfl extends utils.Adapter {
 		};
 		// Delay first schedule run so scoreboard can populate first
 		this._scheduleTimer = setTimeout(tick, 15_000);
+	}
+
+	/**
+	 * Periodic team / logo / venue refresh (default daily; 0 = startup only).
+	 */
+	_startTeamDataRefreshLoop() {
+		const hours = this._teamDataRefreshIntervalHours();
+		if (hours === 0) {
+			this.log.info("Periodic team master-data refresh disabled (startup only).");
+			return;
+		}
+		const intervalMs = hours * 3600 * 1000;
+		const tick = async () => {
+			if (this._teamDataTimer === null) {
+				return;
+			}
+			try {
+				await this.refreshTeamMasterData({ reason: `interval ${hours}h` });
+			} catch (error) {
+				this.log.error(`Team master-data refresh failed: ${error.message}`);
+			}
+			if (this._teamDataTimer !== null) {
+				this._teamDataTimer = setTimeout(tick, intervalMs);
+			}
+		};
+		this.log.info(`Scheduling team master-data refresh every ${hours}h (after first interval).`);
+		this._teamDataTimer = setTimeout(tick, intervalMs);
+	}
+
+	/**
+	 * Kicks off the first scoreboard fetch and schedules subsequent ones.
+	 * Uses a recursive setTimeout so polls never overlap.
+	 */
+	_startScoreboardLoop() {
+		const tick = async () => {
+			if (this._scoreboardTimer === null) {
+				return; // adapter was unloaded
+			}
+			let nextMs = SCOREBOARD_POLL_INTERVAL_IDLE_MS;
+			try {
+				const hasLive = await this.fetchAndStoreScoreboard();
+				nextMs = hasLive ? this._livePollIntervalMs() : SCOREBOARD_POLL_INTERVAL_IDLE_MS;
+			} catch (error) {
+				this.log.error(`Scoreboard poll failed: ${error.message}`);
+			}
+			if (this._scoreboardTimer !== null) {
+				this._scoreboardTimer = setTimeout(tick, nextMs);
+			}
+		};
+		this._scoreboardTimer = setTimeout(tick, 0);
 	}
 
 	/**
@@ -940,7 +1102,8 @@ class Nfl extends utils.Adapter {
 	 * @param {string} objectPath relative or absolute path hint
 	 */
 	_gameToViewJson(game, objectPath) {
-		return {
+		/** @type {Record<string, unknown>} */
+		const dto = {
 			id: game.id,
 			name: game.name,
 			shortName: game.shortName,
@@ -954,9 +1117,6 @@ class Nfl extends utils.Adapter {
 			detail: game.status?.detail ?? "",
 			completed: !!game.status?.completed,
 			phase: game.phase || undefined,
-			venue: game.venue?.fullName || "",
-			broadcasts: game.broadcasts || "",
-			attendance: game.attendance || 0,
 			home: {
 				id: game.home?.teamId ?? "",
 				abbr: game.home?.abbreviation ?? "",
@@ -975,6 +1135,16 @@ class Nfl extends utils.Adapter {
 			},
 			path: objectPath,
 		};
+		if (this._writeGameVenue()) {
+			dto.venue = game.venue?.fullName || "";
+		}
+		if (this._writeGameBroadcasts()) {
+			dto.broadcasts = game.broadcasts || "";
+		}
+		if (this._writeGameAttendance()) {
+			dto.attendance = game.attendance || 0;
+		}
+		return dto;
 	}
 
 	/**
@@ -999,12 +1169,27 @@ class Nfl extends utils.Adapter {
 		await this._setSimpleState(`${basePath}.week`, "Week", "number", "value", game.week ?? 0);
 		await this._setSimpleState(`${basePath}.eventId`, "ESPN event ID", "string", "value", game.id ?? "");
 		await this._setSimpleState(`${basePath}.headline`, "Headline", "string", "text", game.shortName || game.name || "");
-		const sourcePath =
-			game.path ||
-			(game.sourcePath ? String(game.sourcePath) : `${this.namespace}.${basePath}`);
-		await this._setSimpleState(`${basePath}.sourcePath`, "Canonical object path", "string", "value", sourcePath);
-		await this._setSimpleState(`${basePath}.broadcasts`, "Broadcasts", "string", "value", game.broadcasts ?? "");
-		await this._setSimpleState(`${basePath}.attendance`, "Attendance", "number", "value", game.attendance ?? 0);
+
+		if (this._writeGameSourcePath()) {
+			const sourcePath =
+				game.path ||
+				(game.sourcePath ? String(game.sourcePath) : `${this.namespace}.${basePath}`);
+			await this._setSimpleState(`${basePath}.sourcePath`, "Canonical object path", "string", "value", sourcePath);
+		} else {
+			await this._deleteObjectIfExists(`${basePath}.sourcePath`);
+		}
+
+		if (this._writeGameBroadcasts()) {
+			await this._setSimpleState(`${basePath}.broadcasts`, "Broadcasts", "string", "value", game.broadcasts ?? "");
+		} else {
+			await this._deleteObjectIfExists(`${basePath}.broadcasts`);
+		}
+
+		if (this._writeGameAttendance()) {
+			await this._setSimpleState(`${basePath}.attendance`, "Attendance", "number", "value", game.attendance ?? 0);
+		} else {
+			await this._deleteObjectIfExists(`${basePath}.attendance`);
+		}
 
 		if (opts.includePhase) {
 			await this._setSimpleState(`${basePath}.phase`, "View phase", "string", "value", opts.phase || game.phase || "idle");
@@ -1025,18 +1210,22 @@ class Nfl extends utils.Adapter {
 		await this._setSimpleState(`${statusPath}.displayClock`, "Clock", "string", "value", st.displayClock ?? "");
 		await this._setSimpleState(`${statusPath}.completed`, "Completed", "boolean", "indicator", !!st.completed);
 
-		const venue = game.venue || {};
 		const venuePath = `${basePath}.venue`;
-		await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(venuePath), {
-			type: "channel",
-			common: { name: "Venue" },
-			native: {},
-		});
-		await this._setSimpleState(`${venuePath}.id`, "Venue ID", "string", "value", venue.id ?? "");
-		await this._setSimpleState(`${venuePath}.fullName`, "Venue name", "string", "value", venue.fullName ?? "");
-		await this._setSimpleState(`${venuePath}.city`, "City", "string", "value", venue.city ?? "");
-		await this._setSimpleState(`${venuePath}.state`, "State", "string", "value", venue.state ?? "");
-		await this._setSimpleState(`${venuePath}.indoor`, "Indoor", "boolean", "indicator", !!venue.indoor);
+		if (this._writeGameVenue()) {
+			const venue = game.venue || {};
+			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(venuePath), {
+				type: "channel",
+				common: { name: "Venue" },
+				native: {},
+			});
+			await this._setSimpleState(`${venuePath}.id`, "Venue ID", "string", "value", venue.id ?? "");
+			await this._setSimpleState(`${venuePath}.fullName`, "Venue name", "string", "value", venue.fullName ?? "");
+			await this._setSimpleState(`${venuePath}.city`, "City", "string", "value", venue.city ?? "");
+			await this._setSimpleState(`${venuePath}.state`, "State", "string", "value", venue.state ?? "");
+			await this._setSimpleState(`${venuePath}.indoor`, "Indoor", "boolean", "indicator", !!venue.indoor);
+		} else {
+			await this._deleteObjectIfExists(venuePath, true);
+		}
 
 		for (const side of ["home", "away"]) {
 			const c = game[side] || {};
@@ -1234,6 +1423,7 @@ class Nfl extends utils.Adapter {
 		await this._enforceArchiveSeasonRetention(seasonYear);
 		this._currentGames = games;
 		await this._updateDiyViews(games, favoriteTeamIds);
+		await this._pruneDisabledGameExtras();
 
 		this.log.debug(`Scoreboard stored: ${games.length} current events, ${liveCount} live.`);
 		return liveCount > 0;
@@ -1667,6 +1857,7 @@ class Nfl extends utils.Adapter {
 		);
 
 		await this._updateDiyViews(this._currentGames || [], favoriteTeamIds);
+		await this._pruneDisabledGameExtras();
 		this.log.info(`Schedule stored: ${allGames.length} events across ${weekFetches} week fetches (season ${seasonYear}).`);
 	}
 
@@ -2502,7 +2693,9 @@ class Nfl extends utils.Adapter {
 
 				if (ioBrokerObjectID_folder_nflTeam_teamLogo != null && ioBrokerObjectName_folder_nflTeam_teamLogo != null) {
 					// Prefer file storage + CDN URLs for VIS; base64 in objects is opt-in (writeLogoBase64).
-					const teamLogoBase64 = this.config.writeLogoBase64 ? (await this.ensureNFLTeamLogoBase64(teamLogo)) || "" : "";
+					const teamLogoBase64 = this._configFlag(this.config.writeLogoBase64, false)
+						? (await this.ensureNFLTeamLogoBase64(teamLogo)) || ""
+						: "";
 
 					// CREATE: 'TEAM LOGOS' SUBFOLDER for LOGO-TYPE
 					try {
@@ -3508,6 +3701,10 @@ class Nfl extends utils.Adapter {
 			if (this._scheduleTimer !== null) {
 				clearTimeout(this._scheduleTimer);
 				this._scheduleTimer = null;
+			}
+			if (this._teamDataTimer !== null) {
+				clearTimeout(this._teamDataTimer);
+				this._teamDataTimer = null;
 			}
 			callback();
 		} catch (e) {

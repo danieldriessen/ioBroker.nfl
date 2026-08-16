@@ -200,6 +200,62 @@
 			"lg": 4,
 			"xl": 4
 		},
+		"game_extras_header": {
+			"type": "header",
+			"text": "game_extras_header",
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
+		},
+		"writeGameVenue": {
+			"type": "checkbox",
+			"label": "writeGameVenue",
+			"help": "writeGameVenue_help",
+			"default": true,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"writeGameBroadcasts": {
+			"type": "checkbox",
+			"label": "writeGameBroadcasts",
+			"help": "writeGameBroadcasts_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"writeGameAttendance": {
+			"type": "checkbox",
+			"label": "writeGameAttendance",
+			"help": "writeGameAttendance_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
+		"writeGameSourcePath": {
+			"type": "checkbox",
+			"label": "writeGameSourcePath",
+			"help": "writeGameSourcePath_help",
+			"default": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
+		},
 		"storage_header": {
 			"type": "header",
 			"text": "storage_header",
@@ -210,6 +266,20 @@
 			"md": 12,
 			"lg": 12,
 			"xl": 12
+		},
+		"teamDataRefreshIntervalHours": {
+			"type": "number",
+			"label": "teamDataRefreshIntervalHours",
+			"help": "teamDataRefreshIntervalHours_help",
+			"newLine": true,
+			"default": 24,
+			"min": 0,
+			"max": 168,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
 		},
 		"writeLogoBase64": {
 			"type": "checkbox",

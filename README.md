@@ -17,7 +17,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 
 ### Currently available (work in progress)
 
-* Load the NFL team list from ESPN
+* Load the NFL team list from ESPN (startup + configurable refresh, default daily)
 * Download and store selected team logo variants in the adapter file store
 * Create an ioBroker object tree under `nfl-teams.{espnTeamId}.*` (team info, colors, logos; slug is a state, not the folder key)
 * Enrich teams with division and venue data (including venue images) where available
@@ -56,6 +56,8 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 | **Also write JSON view mirrors** | on | — | Extra JSON states for scripts; flat states are always written. |
 | **Fetch multi-week schedule** | on | — | Builds `schedule/{year}/type{N}/week{M}/…` (pre/regular/post). |
 | **Schedule refresh interval (h)** | `6` | 1–48 | Independent of live scoreboard poll. |
+| **Write venue / broadcasts / attendance / sourcePath** | on | — | Optional game extras; disabled fields are deleted on the next poll (including parent `venue` folders). |
+| **Team / logo / venue refresh (h)** | `24` | 0–168 | Re-fetch master data after startup. `24` = daily, `168` = weekly, `0` = startup only. |
 | **Store logo base64 in objects** | off | — | Off recommended; logos remain files + CDN URLs for VIS. |
 
 ### Object paths for DIY VIS
@@ -87,6 +89,8 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) Daily team/logo/venue master-data refresh (admin interval; 0 = startup only)
+* (Daniel Drießen) Optional admin toggles for venue/broadcasts/attendance/sourcePath (prune when off)
 * (Daniel Drießen) Multi-week `schedule/` tree + richer game fields (venue/broadcasts) + view `sourcePath`
 * (Daniel Drießen) Games object model: `current/` + season archives + stable `views.*` (flat + JSON)
 * (Daniel Drießen) Fix favorite-team admin control: use `selectSendTo` (fresh team list on open; standard Save/Close toolbar)
