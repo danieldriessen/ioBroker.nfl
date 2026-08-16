@@ -830,8 +830,61 @@ class Nfl extends utils.Adapter {
 			}
 		}
 
+		// Drop event channels that are no longer on the current scoreboard slate
+		if (eventIdList.length > 0) {
+			await this._pruneStaleGameObjects(eventIdList);
+		}
+
 		this.log.debug(`Scoreboard stored: ${events.length} events, ${liveCount} live.`);
 		return liveCount > 0;
+	}
+
+	/**
+	 * Deletes `nfl-games.{eventId}` trees whose ESPN event id is not in the current scoreboard.
+	 * Keeps the `info` channel. Skips pruning if the current slate is empty (safety).
+	 * @param {Array<string|number>} currentEventIds
+	 */
+	async _pruneStaleGameObjects(currentEventIds) {
+		const keep = new Set(currentEventIds.map(String));
+		const folderPrefix = `${this.namespace}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.`;
+		/** @type {Set<string>} */
+		const staleEventIds = new Set();
+
+		let objects;
+		try {
+			objects = await this.getAdapterObjectsAsync();
+		} catch (error) {
+			this.log.warn(`Could not list adapter objects for game cleanup: ${error.message}`);
+			return;
+		}
+
+		for (const fullId of Object.keys(objects || {})) {
+			if (!fullId.startsWith(folderPrefix)) {
+				continue;
+			}
+			const rest = fullId.slice(folderPrefix.length);
+			const eventId = rest.split(".")[0];
+			if (!eventId || eventId === IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO) {
+				continue;
+			}
+			if (!keep.has(eventId)) {
+				staleEventIds.add(eventId);
+			}
+		}
+
+		if (!staleEventIds.size) {
+			return;
+		}
+
+		this.log.info(`Removing ${staleEventIds.size} stale nfl-games event folder(s) no longer on the scoreboard.`);
+		for (const eventId of staleEventIds) {
+			const relativeId = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${eventId}`;
+			try {
+				await this.delObjectAsync(relativeId, { recursive: true });
+			} catch (error) {
+				this.log.warn(`Failed to delete stale game object '${relativeId}': ${error.message}`);
+			}
+		}
 	}
 
 	/**

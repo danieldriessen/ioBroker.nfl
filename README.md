@@ -21,7 +21,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Download and store selected team logo variants in the adapter file store
 * Create an ioBroker object tree under `nfl-teams.{espnTeamId}.*` (team info, colors, logos; slug is a state, not the folder key)
 * Enrich teams with division and venue data (including venue images) where available
-* Periodic scoreboard polling (ESPN CDN) writing `nfl-games.{eventId}.*` states: live scores, game clock, status, home/away teams
+* Periodic scoreboard polling (ESPN CDN) writing `nfl-games.{eventId}.*` states: live scores, game clock, status, home/away teams; stale event folders from previous weeks are removed automatically
 * Configurable live refresh interval (admin, default 30 s; auto 5 min when no games are live)
 * Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
 * **VIS-1 widget — NFL Scoreboard** (`tplNflScoreboard`): live/upcoming/all modes, favorite-filter, team logos (ESPN CDN), animated live indicator, dark-theme; auto-refreshes every 31 s
