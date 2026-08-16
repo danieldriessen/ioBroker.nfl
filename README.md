@@ -26,7 +26,8 @@ ioBroker adapter that fetches NFL team information (and, planned later, scores a
 
 * Game schedules / scoreboards
 * Live scores and periodic refresh while games are in progress
-* Real VIS widgets (template stub only)
+* Favorite team configuration
+* Production VIS-1 widgets (live / schedule / favorite — template stub only today)
 * Meaningful admin configuration (placeholder options only)
 
 ## Requirements
