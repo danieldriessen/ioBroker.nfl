@@ -1,60 +1,54 @@
 ![Logo](admin/nfl.png)
 # ioBroker.nfl
 
+[![NPM version](https://img.shields.io/npm/v/iobroker.nfl.svg)](https://www.npmjs.com/package/iobroker.nfl)
+[![Downloads](https://img.shields.io/npm/dm/iobroker.nfl.svg)](https://www.npmjs.com/package/iobroker.nfl)
+![Number of Installations](http://iobroker.live/badges/nfl-installed.svg)
+![Number of Installations](http://iobroker.live/badges/nfl-stable.svg)
 [![NPM](https://nodei.co/npm/iobroker.nfl.png?downloads=true)](https://nodei.co/npm/iobroker.nfl/)
+
+![Test and Release](https://github.com/danieldriessen/ioBroker.nfl/workflows/Test%20and%20Release/badge.svg)
 
 ## Description
 
-An adapter for the ioBroker-system that fetches the latest NFL scores and other NFL related information.
+ioBroker adapter that fetches NFL team information (and, planned later, scores and live game updates) from public ESPN sports APIs and exposes it as ioBroker objects and files.
 
-## Current development status, limitations & future goals
+## Features
 
-### In its current state of development the adapter should be able to...
+### Currently available (work in progress)
 
-... do nothing yet. (The adapter just entered the development stage. This section will be updated, once the adapter has basic functionality.)
+* Load the NFL team list from ESPN
+* Download and store selected team logo variants in the adapter file store
+* Create an ioBroker object tree under `nfl-teams.*` (team info, colors, logos)
+* Enrich teams with division and venue data (including venue images) where available
 
-### In its current state of development the adapter is NOT capable of...
+### Not implemented yet
 
-... anything
+* Game schedules / scoreboards
+* Live scores and periodic refresh while games are in progress
+* Real VIS widgets (template stub only)
+* Meaningful admin configuration (placeholder options only)
 
-### Future goals:
+## Requirements
 
-- Acquire a list of NFL-teams and create an ioBroker object tree for them.
-- Acquire a list of current and upcoming (and maybe recent/past) NFL-Games and create some sort of ioBroker object tree for them.
-- Acquire stats for current (currently live) NFL-games (such as scores, game-state, etc.).
-- Provide visualizations for the ioBroker-system (ioBroker.vis).
+* Node.js `>= 18` (see `package.json` `engines`)
+* js-controller `>= 5.0.19`
+* admin `>= 6.17.13`
+* Optional: `vis` (listed for future widgets; not required for team data)
 
-> [!NOTE]
-> It is intended to implement all of the above-mentioned 'Future goals' for this adapter.<br>
-> However, the feasibility of each of these goals is subject to change.<br>
-> None of the functions above are 'guaranteed' to be implemented.<br>
-> The above list is not final. Therefore, it might be altered at any time. Future goals might be added or subtracted at any time.<br>
+## Configuration
 
-## Documentation
+The admin UI still contains placeholder options from the adapter scaffold (`option1` / `option2`). They are not used by the adapter logic yet.
 
-Will follow as soon as functionality is implemented.
+## Data source
 
-## DISCLAIMER
+Unofficial ESPN site/core HTTP APIs (no API key). Endpoints and payloads can change without notice. This project is not affiliated with ESPN or the NFL.
+
+## Disclaimer
 
 The developers of this module are in no way endorsed by or affiliated with the National Football League (NFL), ESPN, or any associated subsidiaries, logos, or trademarks.
 The NFL and ESPN logos used in this adapter are for illustrative purposes only and are the property of their respective owners.
 If there are any concerns regarding the use of copyrighted materials in this adapter, please feel free to contact the developers, and they will promptly address them.
-
-## LIMITATION OF LIABILITY
-
-The developers of this adapter shall not be liable for any damages or issues that arise from the use of the adapter, including but not limited to loss of data, malfunction, or any other damages or issues.
-By using this adapter, you agree that the developers are not responsible for any costs, damages, or issues that may arise from its use.
-
-## USAGE AGREEMENT
-
-By using this adapter, you agree to the following terms:
-
--	You may use this adapter for personal or commercial purposes.
--	You may modify the adapter for your own use, but you may not redistribute it without permission from the developers.
--	The adapter is provided "as is" without any warranty, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
--	The developers of this adapter reserve the right to update, modify, or discontinue the adapter at any time without prior notice.
--	Any feedback or contributions provided by users are greatly appreciated but are not mandatory.
--	The developers of this adapter shall not be liable for any costs, damages, or issues that may arise from its use.
 
 ## Changelog
 <!--
@@ -63,12 +57,13 @@ By using this adapter, you agree to the following terms:
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) Team data, logos, division/venue enrichment (ongoing)
 * (Daniel Drießen) initial release
 
 ## License
 MIT License
 
-Copyright (c) 2024 Daniel Drießen <daniel.driessen@ddproductions.de>
+Copyright (c) 2024-2026 Daniel Drießen <daniel.driessen@ddproductions.de>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

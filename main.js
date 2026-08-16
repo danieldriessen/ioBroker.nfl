@@ -17,84 +17,125 @@ const path = require("path");
 // Import required classes
 const NFLTeam = require("./lib/classes/NFLTeam");
 const { NFLTeamLogo, NFLTeamLogoTypes } = require("./lib/classes/NFLTeamLogo");
+const NFLDivision = require("./lib/classes/NFLDivision");
+const NFLVenue = require("./lib/classes/NFLVenue");
+const NFLVenueAddress = require("./lib/classes/NFLVenueAddress");
+const NFLVenueImage = require("./lib/classes/NFLVenueImage");
 
 // Define constants
 const FORBIDDEN_CHARS = /[^._\-/ :!#$%&()+=@^{}|~\p{Ll}\p{Lu}\p{Nd}]+/gu;
 
 // Define ioBroker object IDs, names & descriptions
-const ioBrokerObjectID_folder_nflTeams = "nfl-teams";
-const ioBrokerObjectName_folder_nflTeams = "NFL-Teams";
-const ioBrokerObjectID_folder_nflTeam_teamInfos = "teamInfos";
-const ioBrokerObjectName_folder_nflTeam_teamInfos = "Team Infos";
-const ioBrokerObjectID_state_nflTeam_id = "id";
-const ioBrokerObjectName_state_nflTeam_id = "ID";
-const ioBrokerObjectID_state_nflTeam_uid = "uid";
-const ioBrokerObjectName_state_nflTeam_uid = "UID";
-const ioBrokerObjectID_state_nflTeam_abbreviation = "abbreviation";
-const ioBrokerObjectName_state_nflTeam_abbreviation = "Abbreviation";
-const ioBrokerObjectID_state_nflTeam_displayName = "displayName";
-const ioBrokerObjectName_state_nflTeam_displayName = "Display name";
-const ioBrokerObjectID_state_nflTeam_shortDisplayName = "shortDisplayName";
-const ioBrokerObjectName_state_nflTeam_shortDisplayName = "Short display name";
-const ioBrokerObjectID_state_nflTeam_name = "name";
-const ioBrokerObjectName_state_nflTeam_name = "Name";
-const ioBrokerObjectID_state_nflTeam_nickname = "nickname";
-const ioBrokerObjectName_state_nflTeam_nickname = "Nickname";
-const ioBrokerObjectID_state_nflTeam_location = "location";
-const ioBrokerObjectName_state_nflTeam_location = "Location";
-const ioBrokerObjectID_folder_nflTeam_teamColors = "teamColors";
-const ioBrokerObjectName_folder_nflTeam_teamColors = "Team Colors";
-const ioBrokerObjectID_state_nflTeam_color = "color";
-const ioBrokerObjectName_state_nflTeam_color = "Color";
-const ioBrokerObjectID_state_nflTeam_alternateColor = "alternateColor";
-const ioBrokerObjectName_state_nflTeam_alternateColor = "Alternate color";
-const ioBrokerObjectID_state_nflTeam_isActive = "isActive";
-const ioBrokerObjectName_state_nflTeam_isActive = "Is active?";
-const ioBrokerObjectID_state_nflTeam_isAllStar = "isAllStar";
-const ioBrokerObjectName_state_nflTeam_isAllStar = "Is AllStar?";
-const ioBrokerObjectID_folder_nflTeam_teamLogos = "teamLogos";
-const ioBrokerObjectName_folder_nflTeam_teamLogos = "Team Logos";
-const ioBrokerObjectID_folder_nflTeam_teamLogo_defaultLogo = "defaultLogo";
-const ioBrokerObjectName_folder_nflTeam_teamLogo_defaultLogo = "Default Logo";
-const ioBrokerObjectID_folder_nflTeam_teamLogo_defaultLogoDark = "defaultLogo_dark";
-const ioBrokerObjectName_folder_nflTeam_teamLogo_defaultLogoDark = "Default Logo (Dark)";
-const ioBrokerObjectID_folder_nflTeam_teamLogo_scoreboardLogo = "scoreboardLogo";
-const ioBrokerObjectName_folder_nflTeam_teamLogo_scoreboardLogo = "Scoreboard Logo";
-const ioBrokerObjectID_folder_nflTeam_teamLogo_scoreboardLogoDark = "scoreboardLogo_dark";
-const ioBrokerObjectName_folder_nflTeam_teamLogo_scoreboardLogoDark = "Scoreboard Logo (Dark)";
-const ioBrokerObjectID_state_nflTeam_teamLogo_url = "url";
-const ioBrokerObjectName_state_nflTeam_teamLogo_url = "URL";
-const ioBrokerObjectID_state_nflTeam_teamLogo_alternativeURL = "alternativeURL";
-const ioBrokerObjectName_state_nflTeam_teamLogo_alternativeURL = "Alternative URL";
-const ioBrokerObjectID_state_nflTeam_teamLogo_width = "width";
-const ioBrokerObjectName_state_nflTeam_teamLogo_width = "Width";
-const ioBrokerObjectID_state_nflTeam_teamLogo_height = "height";
-const ioBrokerObjectName_state_nflTeam_teamLogo_height = "Height";
-const ioBrokerObjectID_state_nflTeam_teamLogo_isDefaultLogo = "isDefaultLogo";
-const ioBrokerObjectName_state_nflTeam_teamLogo_isDefaultLogo = "Is default logo?";
-const ioBrokerObjectID_state_nflTeam_teamLogo_isFullLogo = "isFullLogo";
-const ioBrokerObjectName_state_nflTeam_teamLogo_isFullLogo = "Is full logo?";
-const ioBrokerObjectID_state_nflTeam_teamLogo_isDarkLogo = "isDarkLogo";
-const ioBrokerObjectName_state_nflTeam_teamLogo_isDarkLogo = "Is dark logo?";
-const ioBrokerObjectID_state_nflTeam_teamLogo_isScoreboardLogo = "isScoreboardLogo";
-const ioBrokerObjectName_state_nflTeam_teamLogo_isScoreboardLogo = "Is scoreboard logo?";
-const ioBrokerObjectID_state_nflTeam_teamLogo_localCopyMetaStorageSubPath = "localCopyMetaStorageSubPath";
-const ioBrokerObjectName_state_nflTeam_teamLogo_localCopyMetaStorageSubPath = "Local copy meta-storage sub-path";
-const ioBrokerObjectID_state_nflTeam_teamLogo_base64Image = "base64Image";
-const ioBrokerObjectName_state_nflTeam_teamLogo_base64Image = "Base64-Image";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS = "nfl-teams";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAMS = "NFL-Teams";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS = "teamInfos";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_INFOS = "Team Infos";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ID = "id";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ID = "ID";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__UID = "uid";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__UID = "UID";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SLUG = "slug";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SLUG = "Slug";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ABBREVIATION = "abbreviation";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ABBREVIATION = "Abbreviation";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__DISPLAY_NAME = "displayName";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__DISPLAY_NAME = "Display name";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SHORT_DISPLAY_NAME = "shortDisplayName";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SHORT_DISPLAY_NAME = "Short display name";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NAME = "name";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NAME = "Name";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NICKNAME = "nickname";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NICKNAME = "Nickname";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__LOCATION = "location";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__LOCATION = "Location";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS = "teamColors";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_COLORS = "Team Colors";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__COLOR = "color";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__COLOR = "Color";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ALTERNATE_COLOR = "alternateColor";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ALTERNATE_COLOR = "Alternate color";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ACTIVE = "isActive";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ACTIVE = "Is active?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ALLSTAR = "isAllStar";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ALLSTAR = "Is AllStar?";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS = "teamLogos";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGOS = "Team Logos";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO = "defaultLogo";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO = "Default Logo";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO_DARK = "defaultLogo_dark";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO_DARK = "Default Logo (Dark)";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO = "scoreboardLogo";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO = "Scoreboard Logo";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO_DARK = "scoreboardLogo_dark";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO_DARK = "Scoreboard Logo (Dark)";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__URL = "url";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__URL = "URL";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL = "alternativeURL";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL = "Alternative URL";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__WIDTH = "width";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__WIDTH = "Width";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT = "height";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT = "Height";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO = "isDefaultLogo";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO = "Is default logo?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO = "isFullLogo";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO = "Is full logo?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO = "isDarkLogo";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO = "Is dark logo?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO = "isScoreboardLogo";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO = "Is scoreboard logo?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH = "localCopyMetaStorageSubpath";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH = "Local copy meta-storage subpath";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE = "base64Image";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE = "Base64-Image";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION = "teamDivision";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION = "Team Division";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ID = "id";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ID = "ID";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__UID = "uid";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__UID = "UID";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG = "slug";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG = "Slug";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION = "abbreviation";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION = "Abbreviation";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME = "name";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME = "Name";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE = "teamVenue";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE = "Team Venue";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__ID = "id";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__ID = "ID";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME = "fullName";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME = "Full name";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS = "venueAddress";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS = "Venue address";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY = "city";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY = "City";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE = "state";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE = "State";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE = "zipCode";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE = "ZIP code";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS = "hasGrass";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS = "Has grass";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR = "isIndoor";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR = "Is indoor";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES = "venueImages";
+const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES = "Venue images";
 
 // Define Paths
-const subpath_nflTeamLogoImages = "NFL-Team Logos";
-const subpath_nflTeamLogoImages_defaultLogos = path.join(subpath_nflTeamLogoImages, "Default Logos");
-const subpath_nflTeamLogoImages_darkDefaultLogos = path.join(subpath_nflTeamLogoImages, "Default Logos (Dark)");
-const subpath_nflTeamLogoImages_scoreboardLogos = path.join(subpath_nflTeamLogoImages, "Scoreboard Logos");
-const subpath_nflTeamLogoImages_darkScoreboardLogos = path.join(subpath_nflTeamLogoImages, "Scoreboard Logos (Dark)");
+const SUBPATH__NFL_TEAM_LOGO_IMAGES = "NFL-Team Logos";
+const SUBPATH__NFL_TEAM_LOGO_IMAGES__DEFAULT_LOGOS = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES, "Default Logos");
+const SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_DEFAULT_LOGOS = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES, "Default Logos (Dark)");
+const SUBPATH__NFL_TEAM_LOGO_IMAGES__SCOREBOARD_LOGOS = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES, "Scoreboard Logos");
+const SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_SCOREBOARD_LOGOS = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES, "Scoreboard Logos (Dark)");
+const SUBPATH__NFL_VENUE_IMAGES = "NFL-Venue Images";
 
 // Define URLs
-const url_espnAPI_nflTeams = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams";
+const URL_ESPN_API_BASIC_NFL_TEAM_DATA = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams";
+const URL_ESPN_API_ADDITIONAL_NFL_TEAM_DATA = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{TEAM-ID}";
+const URL_ESPN_API_NFL_DIVISION_DATA = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2021/types/4/groups/{GROUP-ID}";
 
 // Define Timeouts
-const timeout_urlRequests = 5000;
+const TIMEOUT_URL_REQUESTS_PRIMARY = 10000;
 
 class Nfl extends utils.Adapter {
 	/**
@@ -112,7 +153,9 @@ class Nfl extends utils.Adapter {
 		this.on("unload", this.onUnload.bind(this));
 
 		// Define globale variables
-		this.nflTeams = null;
+		this.nflDivisions = [];
+		this.nflTeams = [];
+		this.nflVenues = [];
 	}
 
 	/**************************************************************************************************************************************
@@ -125,9 +168,9 @@ class Nfl extends utils.Adapter {
 		// Reset the connection indicator during startup (to 'false')
 		this.setState("info.connection", false, true);
 
-		// Get NFL-Teams
+		// Get basic data for NFL-Teams
 		try {
-			this.nflTeams = await this.get_NFLteams();
+			this.nflTeams = await this.get_basicData_NFLTeams();
 		} catch (error) {
 			// TODO: Figure out what to do here besides just logging the error and returning. Maybe schedule another try or just set the connection state to false.
 			this.log.error(error.message);
@@ -136,7 +179,25 @@ class Nfl extends utils.Adapter {
 
 		// Download and Store NFL-Team logo-images for all found NFL-Teams
 		try {
-			await this.downloadAndStoreNFLTeamLogoImages(this.nflTeams);
+			await this.downloadAndStore_NFLTeam_LogoImages(this.nflTeams);
+		} catch (error) {
+			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
+			this.log.error(error.message);
+			return;
+		}
+
+		// Get additional data for NFL-Teams
+		try {
+			await this.get_additionalData_NFLTeams(this.nflTeams, this.nflDivisions, this.nflVenues);
+		} catch (error) {
+			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
+			this.log.error(error.message);
+			return;
+		}
+
+		// Download and Store NFL-Venue images for all found NFL-Venues (associated with existing NFL-Teams)
+		try {
+			await this.downloadAndStore_NFLVenue_Images(this.nflVenues);
 		} catch (error) {
 			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
 			this.log.error(error.message);
@@ -145,159 +206,165 @@ class Nfl extends utils.Adapter {
 
 		// Store NFL-Teams to object structure
 		try {
-			await this.store_NFLteams(this.nflTeams);
+			await this.createObjectStructure_NFLTeams(this.nflTeams);
 		} catch (error) {
 			// TODO: Figure out what to do here besides just logging the error and returning. Maybe just set the connection state to false.
 			this.log.error(error.message);
 			return;
 		}
+
+		// Initialization completed successfully
+		await this.setStateAsync("info.connection", true, true);
 	}
 
 	/**************************************************************************************************************************************
-	 * Fetches and processes a list of NFL teams from a specified API endpoint.
+	 * Fetches and processes a list of NFL-Teams from a specified API endpoint.
 	 *
 	 * The function performs the following steps:
-	 * 1. Logs the beginning of the process and the URL being used.
-	 * 2. Sends an HTTP GET request to the specified URL to fetch the NFL teams.
-	 * 3. Validates the structure of the received JSON response.
-	 * 4. Processes the response to create instances of the NFLTeam class, along with their associated logos.
-	 * 5. Returns an array of NFLTeam instances.
+	 * 1. Sends an HTTP GET request to the specified URL to fetch the NFL-Teams data.
+	 * 3. Validates the structure of the received JSON response to ensure it contains the expected data.
+	 * 4. Processes the response data to create instances of the 'NFLTeam' class, along with their associated logos.
+	 * 5. Returns an array of 'NFLTeam' instances.
 	 *
-	 * Throws an error if:
-	 * - The HTTP request fails.
-	 * - The received response is invalid or does not contain the expected structure.
-	 * - An error occurs while creating NFLTeam instances.
+	 * The function ensures the following validations and error handling:
+	 * - Checks if the HTTP request is successful. If it fails, throws an error with a relevant message.
+	 * - Verifies that the received response is a valid JSON object. If not, throws an error indicating an invalid response.
+	 * - Checks that the JSON response seems contain the expected structure with a list of NFL-Teams. If not, throws an error.
+	 * - Creates instances of 'NFLTeam' class using the fetched data, and if any error occurs during this process, throws an error.
 	 *
-	 * @returns {Promise<NFLTeam[]>} A promise that resolves to an array of NFLTeam instances.
-	 * @throws {Error} If fetching or processing the NFL teams fails.
+	 * @returns {Promise<NFLTeam[]>} A promise that resolves to an array of 'NFLTeam' instances.
 	 *
-	 * @todo Recreate this documentation
+	 * @throws {Error} If fetching or processing the NFL-Teams data fails at any step.
 	 **************************************************************************************************************************************/
-	async get_NFLteams() {
-		this.log.debug(`Getting NFL-Teams...`);
-		this.log.debug(`Fetching NFL-Teams information using URL: ${url_espnAPI_nflTeams}...`);
+	async get_basicData_NFLTeams() {
+		this.log.debug(`Getting basic data for NFL-Teams...`);
+		this.log.silly(`Fetching basic data for NFL-Teams using URL: '${URL_ESPN_API_BASIC_NFL_TEAM_DATA}'...`);
+
+		// Get the JSON content from the URL
+		let responseData = null;
+		try {
+			const response = await axios.get(URL_ESPN_API_BASIC_NFL_TEAM_DATA, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+			responseData = response.data;
+		} catch (error) {
+			const errorMessage = `Error while fetching basic data for NFL-Teams: ${error.message}`;
+			throw new Error(errorMessage);
+		}
+
+		// Check if we received a valid response
+		if (!responseData || typeof responseData !== "object" || responseData === null) {
+			const errorMessage = `Error while fetching basic data for NFL-Teams: Invalid response received!`;
+			throw new Error(errorMessage);
+		}
+
+		// Check if the response has the expected JSON structure
+		if (!responseData.sports || !Array.isArray(responseData.sports)) {
+			const errorMessage = `Error while fetching basic data for NFL-Teams: Invalid JSON structure received!`;
+			throw new Error(errorMessage);
+		}
+
+		this.log.debug(`Successfully fetched basic data for NFL-Teams.`);
+		this.log.silly(`Response-Data: ${JSON.stringify(responseData)}`);
+
+		// Process and create NFLTeam instances
+		this.log.debug(`Creating array for NFL-Teams...`);
+
+		const nflTeams = [];
 
 		try {
-			// Get the content from the NFL-Team information URL
-			const response = await axios.get(url_espnAPI_nflTeams, { timeout: timeout_urlRequests });
-			const responseData = response.data;
+			responseData.sports[0].leagues[0].teams.map((teamData) => {
+				const team = teamData.team;
 
-			// Check if we received a valid response
-			if (typeof responseData === "object" && responseData !== null) {
-				// Check if the response has the expected JSON structure
-				if (responseData.sports && Array.isArray(responseData.sports)) {
-					this.log.debug(`Successfully fetched NFL-Teams information.`);
-					this.log.silly(`Response-Data: ${JSON.stringify(responseData)}`);
+				this.log.debug(`Creating NFLTeam object for NFL-Team: ${team.displayName}...`);
 
-					// Process and create NFLTeam instances
-					this.log.debug(`Creating array for NFL-Teams...`);
+				try {
+					// Get the NFL-Team logos and create an array
+					const teamLogos = [];
+					for (const teamLogo of team.logos) {
+						const newTeamLogo = new NFLTeamLogo(teamLogo.href, teamLogo.alt || "", teamLogo.width, teamLogo.height, teamLogo.rel.includes("default"), teamLogo.rel.includes("full"), teamLogo.rel.includes("dark"), teamLogo.rel.includes("scoreboard"));
 
-					const nflTeams = [];
+						// Set the desired 'local copy meta storage sub path' for the specific NFL-Team logo.
+						if (teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DEFAULT_LOGOS, team.slug + ".png");
+						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_DEFAULT_LOGOS, team.slug + ".png");
+						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__SCOREBOARD_LOGOS, team.slug + ".png");
+						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_SCOREBOARD_LOGOS, team.slug + ".png");
+						}
 
-					try {
-						responseData.sports[0].leagues[0].teams.map((teamData) => {
-							const team = teamData.team;
-
-							this.log.debug(`Creating NFLTeam object for NFL-Team: ${team.displayName}...`);
-
-							try {
-								// Get the NFL-Team logos and create an array
-								const teamLogos = [];
-								for (const teamLogo of team.logos) {
-									const newTeamLogo = new NFLTeamLogo(teamLogo.href, teamLogo.alt || "", teamLogo.width, teamLogo.height, teamLogo.rel.includes("default"), teamLogo.rel.includes("full"), teamLogo.rel.includes("dark"), teamLogo.rel.includes("scoreboard"));
-
-									// Set the desired 'local copy meta storage sub path' for the specific NFL-Team logo.
-									if (teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
-										newTeamLogo.localCopyMetaStorageSubPath = path.join(subpath_nflTeamLogoImages_defaultLogos, team.slug + ".png");
-									} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
-										newTeamLogo.localCopyMetaStorageSubPath = path.join(subpath_nflTeamLogoImages_darkDefaultLogos, team.slug + ".png");
-									} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
-										newTeamLogo.localCopyMetaStorageSubPath = path.join(subpath_nflTeamLogoImages_scoreboardLogos, team.slug + ".png");
-									} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
-										newTeamLogo.localCopyMetaStorageSubPath = path.join(subpath_nflTeamLogoImages_darkScoreboardLogos, team.slug + ".png");
-									}
-
-									teamLogos.push(newTeamLogo);
-								}
-
-								// Create the NFLTeam object
-								const newNFLTeam = new NFLTeam(Number(team.id), team.uid, team.slug, team.abbreviation, team.displayName, team.shortDisplayName, team.name, team.nickname, team.location, team.color, team.alternateColor, team.isActive, team.isAllStar, teamLogos);
-
-								nflTeams.push(newNFLTeam);
-							} catch (error) {
-								const errorMessage = `Error while creating NFLTeam object: ${error.message}`;
-								throw new Error(errorMessage);
-							}
-
-							this.log.debug(`Created NFLTeam object for NFL-Team: ${team.displayName}.`);
-						});
-
-						this.log.debug(`Created array for ${nflTeams.length} NFL-Teams.`);
-						return nflTeams;
-					} catch (error) {
-						const errorMessage = `Error while creating array for NFL-Teams: ${error.message}`;
-						throw new Error(errorMessage);
+						teamLogos.push(newTeamLogo);
 					}
-				} else {
-					const errorMessage = `Error while fetching NFL-Teams: Invalid JSON structure received!`;
+
+					// Create the NFLTeam object
+					const newNFLTeam = new NFLTeam(Number(team.id), team.uid, team.slug, team.abbreviation, team.displayName, team.shortDisplayName, team.name, team.nickname, team.location, team.color, team.alternateColor, team.isActive, team.isAllStar, teamLogos);
+
+					nflTeams.push(newNFLTeam);
+				} catch (error) {
+					const errorMessage = `Error while creating NFLTeam object for NFL-Team '${team.displayName}': ${error.message}`;
 					throw new Error(errorMessage);
 				}
-			} else {
-				const errorMessage = `Error while fetching NFL-Teams: Invalid response received!`;
-				throw new Error(errorMessage);
-			}
+
+				this.log.debug(`Successfully created NFLTeam object for NFL-Team '${team.displayName}'.`);
+			});
+
+			this.log.debug(`Successfully created array for ${nflTeams.length} NFL-Teams.`);
+			return nflTeams;
 		} catch (error) {
-			const errorMessage = `Error while fetching NFL-Teams: ${error.message}`;
+			const errorMessage = `Error while creating array for NFL-Teams: ${error.message}`;
 			throw new Error(errorMessage);
 		}
 	}
 
 	/**************************************************************************************************************************************
-	 * Downloads and stores NFL team logo images.
+	 * Downloads and stores NFL-Team logo images.
 	 *
-	 * This function takes an array of NFLTeam objects, validates the array, and then downloads the logos for each team based on the
-	 * specified logo type (default, dark-default, scoreboard, dark-scoreboard). It stores the logos in both full-size and scaled-down
-	 * versions. In case of errors, it logs the error and skips to the next team.
+	 * This function takes an array of 'NFLTeam' objects, validates the array, and then downloads the logos for each team based on the
+	 * specified logo type (Default Logo, Default Logo (Dark), Scoreboard Logo, Scoreboard Logo (Dark)).
+	 * It uses the function 'downloadFileToAdapterFilesDataSubDir' to store the downloaded logo images to the approriate subdirectory
+	 * for the specific logo.
+	 * In case of errors during the download, it skips to the next logo to download while logging a warning.
 	 *
-	 * @param {NFLTeam[]} nflTeams - Array of NFLTeam objects to process.
+	 * @param {NFLTeam[]} nflTeams - Array of 'NFLTeam' objects to process.
 	 *
 	 * @returns {Promise<void>} - Returns a promise that resolves when all logos have been processed.
-	 * @throws {Error} - Throws an error if validation of the NFL teams array fails.
 	 *
-	 * @todo Recreate this documentation
+	 * @throws {TypeError} - Throws an error if validation of the NFL-Teams array fails.
 	 **************************************************************************************************************************************/
-	async downloadAndStoreNFLTeamLogoImages(nflTeams) {
+	async downloadAndStore_NFLTeam_LogoImages(nflTeams) {
 		this.log.debug(`Downloading and storing NFL-Team logo-images...`);
 
 		// Validate received parameter 'nflTeams'
+		if (!nflTeams) {
+			const errorMessage = `Error while downloading and storing NFL-Team logo-images: Missing value for parameter 'nflTeams'!`;
+			throw new TypeError(errorMessage);
+		}
 		try {
 			NFLTeam.validateNFLTeamsArray(nflTeams);
 		} catch (error) {
 			const errorMessage = `Error while downloading and storing NFL-Team logo-images: ${error.message}`;
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 
 		// Download all NFL-Team logo images for all NFL-Teams
-
 		// Iterate NFL-Teams
 		for (const nflTeam of nflTeams) {
 			this.log.debug(`Downloading and storing NFL-Team logo-images for NFL-Team '${nflTeam.displayName}'...`);
 
 			// Iterate NFL-Team logo-images
 			for (const nflTeamLogo of nflTeam.teamLogos) {
+				// Skip logo variants that are intentionally not stored (no resolved storage path).
+				if (!nflTeamLogo.localCopyMetaStorageSubPath) {
+					this.log.silly(`Skipping download of unmatched NFL-Team logo variant for NFL-Team '${nflTeam.displayName}' (no local storage path).`);
+					continue;
+				}
 				try {
-					const downloadSuccess = await this.downloadFileToAdapterFilesDataSubDir(nflTeamLogo.url, path.dirname(nflTeamLogo.localCopyMetaStorageSubPath), path.basename(nflTeamLogo.localCopyMetaStorageSubPath));
-
-					if (downloadSuccess) {
-						this.log.debug(`Successfully downloaded and stored NFL-Team logo-image of type '${NFLTeamLogo.getHumanReadableNFLTeamLogoType(nflTeamLogo)}' for NFL-Team '${nflTeam.displayName}'.`);
-					} else {
-						const errorMessage = `Error while downloading and storing NFL-Team logo-image of type '${NFLTeamLogo.getHumanReadableNFLTeamLogoType(nflTeamLogo)}' for NFL-Team '${nflTeam.displayName}': Unknown error!`;
-						this.log.error(errorMessage);
-						continue; // Skip to the next iteration
-					}
+					await this.downloadFileToAdapterFilesDataSubDir(nflTeamLogo.url, path.dirname(nflTeamLogo.localCopyMetaStorageSubPath), path.basename(nflTeamLogo.localCopyMetaStorageSubPath));
+					this.log.debug(`Successfully downloaded and stored NFL-Team logo-image of type '${NFLTeamLogo.getHumanReadableNFLTeamLogoType(nflTeamLogo)}' for NFL-Team '${nflTeam.displayName}'.`);
 				} catch (error) {
-					const errorMessage = `Error while downloading and storing NFL-Team logo-image for NFL-Team '${nflTeam.displayName}': ${error.message}`;
+					const errorMessage = `Error while downloading and storing NFL-Team logo-image of type '${NFLTeamLogo.getHumanReadableNFLTeamLogoType(nflTeamLogo)}' for NFL-Team '${nflTeam.displayName}': ${error.message}`;
 					this.log.error(errorMessage);
+					this.log.warn(`Skipping download of NFL-Team logo-image of type '${NFLTeamLogo.getHumanReadableNFLTeamLogoType(nflTeamLogo)}' for NFL-Team '${nflTeam.displayName}'!`);
 					continue; // Skip to the next iteration
 				}
 			}
@@ -309,14 +376,404 @@ class Nfl extends utils.Adapter {
 	/**************************************************************************************************************************************
 	 * @todo add documentation for this function
 	 **************************************************************************************************************************************/
-	async store_NFLteams(nflTeams) {
-		this.log.debug(`Storing NFL-Teams...`);
+	async get_additionalData_NFLTeams(nflTeams, nflDivisions, nflVenues) {
+		this.log.debug(`Getting additional data for NFL-Teams...`);
+
+		// Validate received parameter 'nflTeams'
+		if (!nflTeams) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: Missing value for parameter 'nflTeams'!`;
+			throw new TypeError(errorMessage);
+		}
+		try {
+			NFLTeam.validateNFLTeamsArray(nflTeams);
+		} catch (error) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: ${error.message}`;
+			throw new TypeError(errorMessage);
+		}
+
+		// Validate received parameter 'nflDivisions'
+		if (!nflDivisions) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: Missing value for parameter 'nflDivisions'!`;
+			throw new TypeError(errorMessage);
+		}
+		try {
+			NFLDivision.validateNFLDivisionsArray(nflDivisions, true);
+		} catch (error) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: ${error.message}`;
+			throw new TypeError(errorMessage);
+		}
+
+		// Validate received parameter 'nflVenues'
+		if (!nflVenues) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: Missing value for parameter 'nflVenues'!`;
+			throw new TypeError(errorMessage);
+		}
+		try {
+			NFLVenue.validateNFLVenuesArray(nflVenues, true);
+		} catch (error) {
+			const errorMessage = `Error while getting additional data for NFL-Teams: ${error.message}`;
+			throw new TypeError(errorMessage);
+		}
+
+		for (const nflTeam of nflTeams) {
+			this.log.debug(`Getting additional data for NFL-Team '${nflTeam.displayName}'...`);
+
+			const url = URL_ESPN_API_ADDITIONAL_NFL_TEAM_DATA.replace("{TEAM-ID}", nflTeam.id);
+			this.log.debug(`Fetching additional data for NFL-Team '${nflTeam.displayName}' using URL: '${url}'...`);
+
+			// Get the content from the NFL-Team information URL
+			let responseData = null;
+			try {
+				const response = await axios.get(url, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+				responseData = response.data;
+			} catch (error) {
+				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': ${error.message}`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of additional data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+				continue;
+			}
+
+			// Check if we received a valid response
+			if (!responseData || typeof responseData !== "object" || responseData === null) {
+				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Invalid response received!`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of additional data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+				continue;
+			}
+
+			// Check if the response has the expected JSON structure
+			if (!responseData.team || !responseData.team.id || !responseData.team.slug) {
+				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Invalid JSON structure received!`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of additional data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+				continue;
+			}
+
+			// Get the NFL-Team data part from the response date
+			const team = responseData.team;
+
+			// Check if we got the response for the correct NFL-Team
+			if (Number(team.id) !== nflTeam.id || team.slug !== nflTeam.slug) {
+				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Wrong information received!`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of additional data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+				continue;
+			}
+
+			this.log.debug(`Successfully fetched additional data for NFL-Team '${nflTeam.displayName}'.`);
+			this.log.silly(`Response-Data: ${JSON.stringify(responseData)}`);
+
+			// NFL-DIVISION
+			// Check if NFL-Division 'id' is included in the response data
+			if (team.groups?.id) {
+				// Check if we already fetched the information for the NFL-Division.
+				let nflDivisionInformation = null;
+				for (const nflDivision of nflDivisions) {
+					if (Number(nflDivision.id) === Number(team.groups.id)) {
+						nflDivisionInformation = nflDivision;
+					}
+				}
+
+				if (nflDivisionInformation !== null) {
+					// <-- We already fetched the division information before. No need to do it again.
+					// Add the 'NFLDivision' object to the existing 'NFLTeam' object.
+					try {
+						nflTeam.setNFLDivision(nflDivisionInformation);
+					} catch (error) {
+						const errorMessage = `Error while updating NFLTeam object for NFL-Team '${nflTeam.displayName}': Unable to add NFL-Division data!`;
+						this.log.error(errorMessage);
+						const warningMessage = `Warning: Skipping acquisition of NFL-Division data for NFL-Team '${nflTeam.displayName}'!`;
+						this.log.warn(warningMessage);
+					}
+				} else {
+					// Get the NFL-Division information (from the appropriate API endpoint)
+					let newNFLDivision = null;
+					try {
+						newNFLDivision = await this.get_data_NFLDivision(Number(team.groups.id));
+
+						// Check if we received a valid 'NFLDivision' object
+						if (newNFLDivision instanceof NFLDivision) {
+							// Add the 'NFLDivision' object to the array of already fetched 'NFLDivision' objects.
+							nflDivisions.push(newNFLDivision);
+
+							// Add the 'NFLDivision' object to the existing 'NFLTeam' object.
+							try {
+								nflTeam.setNFLDivision(newNFLDivision);
+							} catch (error) {
+								const errorMessage = `Error while updating NFLTeam object for NFL-Team '${nflTeam.displayName}': Unable to add NFL-Division data!`;
+								this.log.error(errorMessage);
+								const warningMessage = `Warning: Skipping acquisition of NFL-Division data for NFL-Team '${nflTeam.displayName}'!`;
+								this.log.warn(warningMessage);
+							}
+						} else {
+							const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': An unknown error occurred while retrieving NFL-Division data!`;
+							this.log.error(errorMessage);
+							const warningMessage = `Warning: Skipping acquisition of NFL-Division data for NFL-Team '${nflTeam.displayName}'!`;
+							this.log.warn(warningMessage);
+						}
+					} catch (error) {
+						const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Could not retrieve NFL-Division data!: ${error.message}`;
+						this.log.error(errorMessage);
+						const warningMessage = `Warning: Skipping acquisition of NFL-Division data for NFL-Team '${nflTeam.displayName}'!`;
+						this.log.warn(warningMessage);
+					}
+				}
+			} else {
+				const errorMessage = `Error while getting NFL-Division data for NFL-Team '${nflTeam.displayName}': 'ID' of NFL-Division could not be found within the data for the NFL-Team!`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of NFL-Division data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+			}
+
+			// NFL-VENUE
+			// Check if NFL-Venue 'id' is included in the response data
+			if (team.franchise?.venue?.id) {
+				// Check if we already fetched the information for the NFL-Venue.
+				let nflVenueInformation = null;
+				for (const nflVenue of nflVenues) {
+					if (Number(nflVenue.id) === Number(team.franchise.venue.id)) {
+						nflVenueInformation = nflVenue;
+					}
+				}
+
+				if (nflVenueInformation !== null) {
+					// <-- We already fetched the venue information before. No need to do it again.
+					// Add the 'NFLVenue' object to the existing 'NFLTeam' object.
+					try {
+						nflTeam.setNFLVenue(nflVenueInformation);
+					} catch (error) {
+						const errorMessage = `Error while updating NFLTeam object for NFL-Team '${nflTeam.displayName}': Unable to add NFL-Venue data!`;
+						this.log.error(errorMessage);
+						const warningMessage = `Warning: Skipping acquisition of NFL-Venue data for NFL-Team '${nflTeam.displayName}'!`;
+						this.log.warn(warningMessage);
+					}
+				} else {
+					// Get the NFL-Venue information
+					let venueAddress = null;
+					const venueImages = [];
+					let venue = null;
+
+					if (team.franchise.venue.address) {
+						try {
+							venueAddress = new NFLVenueAddress(team.franchise.venue.address.city, team.franchise.venue.address.state, team.franchise.venue.address.zipCode);
+						} catch (error) {
+							const warningMessage = `Warning: Unable to create NFLVenueAaddress object for Venue of NFL-Team '${nflTeam.displayName}': ${error.message}`;
+							this.log.warn(warningMessage);
+						}
+					} else {
+						const warningMessage = `Warning: Skipping acquisition of NFL-Venue address data for NFL-Team '${nflTeam.displayName}': No venue address found!`;
+						this.log.warn(warningMessage);
+					}
+
+					if (team.franchise.venue.images && Array.isArray(team.franchise.venue.images) && team.franchise.venue.images.length > 0) {
+						for (const nflVenueImage of team.franchise.venue.images) {
+							let localCopyMetaStorageSubPath_imageNameAndExtensionComponent = team.franchise.venue.id;
+
+							if (nflVenueImage.rel.includes("full")) {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_full";
+							} else {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_partial";
+							}
+							if (nflVenueImage.rel.includes("day")) {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_day";
+							} else {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_night";
+							}
+							if (nflVenueImage.rel.includes("interior")) {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_interior";
+							} else {
+								localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + "_exterior";
+							}
+
+							localCopyMetaStorageSubPath_imageNameAndExtensionComponent = localCopyMetaStorageSubPath_imageNameAndExtensionComponent + ".png";
+
+							const localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_VENUE_IMAGES, team.franchise.venue.id, localCopyMetaStorageSubPath_imageNameAndExtensionComponent);
+							this.log.debug(`PATH: ${localCopyMetaStorageSubPath}`);
+
+							try {
+								const newVenueImage = new NFLVenueImage(nflVenueImage.href, nflVenueImage.alt, Number(nflVenueImage.width), Number(nflVenueImage.height), nflVenueImage.rel.includes("full"), nflVenueImage.rel.includes("day"), nflVenueImage.rel.includes("interior"), localCopyMetaStorageSubPath);
+								venueImages.push(newVenueImage);
+							} catch (error) {
+								const warningMessage = `Warning: Unable to add NFLVenueImage object to NFLVenueImages array for Venue of NFL-Team '${nflTeam.displayName}': ${error.message}`;
+								this.log.warn(warningMessage);
+							}
+						}
+					} else {
+						const warningMessage = `Warning: Skipping acquisition of NFL-Venue images data for NFL-Team '${nflTeam.displayName}': No venue image found!`;
+						this.log.warn(warningMessage);
+					}
+
+					if (team.franchise.venue.id) {
+						try {
+							venue = new NFLVenue(Number(team.franchise.venue.id), team.franchise.venue.fullName, venueAddress, team.franchise.venue.grass, team.franchise.venue.indoor, venueImages);
+						} catch (error) {
+							const warningMessage = `Warning: Unable to create NFLVenue object for Venue of NFL-Team '${nflTeam.displayName}': ${error.message}`;
+							this.log.warn(warningMessage);
+						}
+
+						if (venue !== null) {
+							nflVenues.push(venue);
+
+							try {
+								nflTeam.setNFLVenue(venue);
+							} catch (error) {
+								const errorMessage = `Error while updating NFLTeam object for NFL-Team '${nflTeam.displayName}': Unable to add NFL-Venue data!`;
+								this.log.error(errorMessage);
+								const warningMessage = `Warning: Skipping acquisition of NFL-Venue data for NFL-Team '${nflTeam.displayName}'!`;
+								this.log.warn(warningMessage);
+							}
+						}
+					} else {
+						const warningMessage = `Warning: Skipping acquisition of NFL-Venue data for NFL-Team '${nflTeam.displayName}': No venue data found!`;
+						this.log.warn(warningMessage);
+					}
+				}
+			} else {
+				const errorMessage = `Error while getting NFL-Venue data for NFL-Team '${nflTeam.displayName}': 'ID' of NFL-Venue could not be found within the data for the NFL-Team!`;
+				this.log.error(errorMessage);
+				const warningMessage = `Warning: Skipping acquisition of NFL-Venue data for NFL-Team '${nflTeam.displayName}'!`;
+				this.log.warn(warningMessage);
+			}
+		}
+	}
+
+	/**************************************************************************************************************************************
+	 * Fetches and processes data for a specific NFL-Division using its ID.
+	 *
+	 * This function performs the following steps:
+	 * 1. Validates the provided ID parameter to ensure it is a positive number.
+	 * 3. Constructs the URL for the API endpoint using the provided ID.
+	 * 4. Sends an HTTP GET request to the API endpoint to fetch the NFL-Division data.
+	 * 5. Validates the structure and content of the received JSON response.
+	 * 6. Creates an instance of the 'NFLDivision' class using the received data.
+	 * 7. Returns the created 'NFLDivision' instance.
+	 *
+	 * Throws an error if:
+	 * - The provided ID is not a positive number.
+	 * - The HTTP request fails.
+	 * - The received response is invalid or does not contain the expected structure.
+	 * - An error occurs while creating the 'NFLDivision' instance.
+	 *
+	 * @param {number} id - The ID of the NFL-Division to fetch data for.
+	 *
+	 * @returns {Promise<NFLDivision>} A promise that resolves to an 'NFLDivision' instance.
+	 *
+	 * @throws {TypeError} If the provided ID is not a positive number.
+	 * @throws {Error} If fetching or processing the NFL-Division data fails.
+	 **************************************************************************************************************************************/
+	async get_data_NFLDivision(id) {
+		this.log.debug(`Getting data for NFL-Division with ID '${id}'...`);
+
+		// Validate "id" parameter
+		if (!id) {
+			const errorMessage = `Error while getting data for NFL-Division: Missing value for parameter 'id'!`;
+			throw new TypeError(errorMessage);
+		}
+		if (typeof id !== "number" || id <= 0) {
+			const errorMessage = `Error while getting data for NFL-Division with ID '${id}': Invalid value for parameter 'id'!`;
+			throw new TypeError(errorMessage);
+		}
+
+		// Get the content from the NFL-Division information URL
+		const url = URL_ESPN_API_NFL_DIVISION_DATA.replace("{GROUP-ID}", id.toString());
+		this.log.silly(`Fetching data for NFL-Division with ID '${id}' using URL: '${url}'...`);
+
+		const response = await axios.get(url, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+		const responseData = response.data;
+
+		if (typeof responseData === "object" && responseData !== null) {
+			// Check if the response has the expected JSON structure
+			if (responseData.id) {
+				// Check if we got the response for the correct NFL-Team
+				if (Number(responseData.id) === id) {
+					// Create the NFLDivision object
+					this.log.debug(`Creating NFLDivision object for NFL-Division with ID '${id}'...`);
+					try {
+						const newNFLDivision = new NFLDivision(Number(responseData.id), responseData.uid, responseData.slug, responseData.abbreviation, responseData.name);
+						this.log.debug(`Successfully created NFLDivision object for NFL-Division with ID '${id}'`);
+						return newNFLDivision;
+					} catch (error) {
+						const errorMessage = `Error while creating NFLDivision object for NFL-Division with ID '${id}': ${error.message}`;
+						throw new Error(errorMessage);
+					}
+				} else {
+					const errorMessage = `Error while getting data for NFL-Division with ID '${id}': Invalid data received!`;
+					throw new Error(errorMessage);
+				}
+			} else {
+				const errorMessage = `Error while getting data for NFL-Division with ID '${id}': Invalid JSON structure received!`;
+				throw new Error(errorMessage);
+			}
+		} else {
+			const errorMessage = `Error while getting data for NFL-Division with ID '${id}': Invalid response received!`;
+			throw new Error(errorMessage);
+		}
+	}
+
+	/**************************************************************************************************************************************
+	 * @todo add documentation for this function
+	 **************************************************************************************************************************************/
+	async downloadAndStore_NFLVenue_Images(nflVenues) {
+		this.log.debug(`Downloading and storing NFL-Venue images...`);
+
+		// Validate received parameter 'nflVenues'
+		if (!nflVenues) {
+			const errorMessage = `Error while downloading and storing NFL-Venue images: Missing value for parameter 'nflVenues'!`;
+			throw new TypeError(errorMessage);
+		}
+		try {
+			NFLVenue.validateNFLVenuesArray(nflVenues, true);
+		} catch (error) {
+			const errorMessage = `Error while downloading and storing NFL-Venue images: ${error.message}`;
+			throw new TypeError(errorMessage);
+		}
+
+		if (nflVenues.length === 0) {
+			this.log.debug(`No NFL-Venues available — skipping venue image downloads.`);
+			return;
+		}
+
+		// Download all NFL-Venue images for all NFL-Venues (stored in the nflVenues array)
+		// Iterate NFL-Venues
+		for (const nflVenue of nflVenues) {
+			this.log.debug(`Downloading and storing NFL-Venue images for NFL-Venue with ID '${nflVenue.id}' & Name '${nflVenue.fullName}'...`);
+
+			// Iterate NFL-Venue images
+			for (const venueImage of nflVenue.venueImages) {
+				if (!venueImage.localCopyMetaStorageSubPath) {
+					this.log.warn(`Skipping download of NFL-Venue image for NFL-Venue with ID '${nflVenue.id}' & Name '${nflVenue.fullName}': missing local storage path.`);
+					continue;
+				}
+				try {
+					await this.downloadFileToAdapterFilesDataSubDir(venueImage.url, path.dirname(venueImage.localCopyMetaStorageSubPath), path.basename(venueImage.localCopyMetaStorageSubPath));
+					this.log.debug(`Successfully downloaded and stored NFL-Venue image for NFL-Venue with ID '${nflVenue.id}' & Name '${nflVenue.fullName}'.`);
+				} catch (error) {
+					const errorMessage = `Error while downloading and storing NFL-Venue image for NFL-Venue with ID '${nflVenue.id}' & Name '${nflVenue.fullName}': ${error.message}`;
+					this.log.error(errorMessage);
+					this.log.warn(`Skipping download of NFL-Venue image for NFL-Venue with ID '${nflVenue.id}' & Name '${nflVenue.fullName}'!`);
+					continue; // Skip to the next iteration
+				}
+			}
+		}
+
+		this.log.debug(`Finished downloading and storing NFL-Venue images.`);
+	}
+
+	/**************************************************************************************************************************************
+	 * @todo add documentation for this function
+	 **************************************************************************************************************************************/
+	async createObjectStructure_NFLTeams(nflTeams) {
+		this.log.debug(`Creating object structure for NFL-Teams...`);
 
 		// Validate received parameter 'nflTeams'
 		try {
 			NFLTeam.validateNFLTeamsArray(nflTeams);
 		} catch (error) {
-			const errorMessage = `Error while storing NFL-Teams: ${error.message}`;
+			const errorMessage = `Error while creating object structure for NFL-Teams: ${error.message}`;
 			throw new Error(errorMessage);
 		}
 
@@ -324,10 +781,10 @@ class Nfl extends utils.Adapter {
 		this.log.debug(`Creating folder for NFL-Teams...`);
 		try {
 			let folderCreationResult = null;
-			folderCreationResult = await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams), {
+			folderCreationResult = await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS), {
 				type: "folder",
 				common: {
-					name: ioBrokerObjectName_folder_nflTeams,
+					name: IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAMS,
 				},
 				native: {},
 			});
@@ -341,16 +798,16 @@ class Nfl extends utils.Adapter {
 				this.log.debug(`Updating the folder for NFL-Teams...`);
 
 				// Fetch the existing object to preserve its current properties
-				const existingObject = await this.getObjectAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams));
+				const existingObject = await this.getObjectAsync(replaceForbiddenCharactersInObjectID(IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS));
 
 				if (existingObject) {
 					existingObject.common = {
 						...existingObject.common,
-						name: ioBrokerObjectName_folder_nflTeams,
+						name: IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAMS,
 					};
 
 					try {
-						const folderUpdateResult = await this.extendObjectAsync(replaceForbiddenCharactersInObjectID(ioBrokerObjectID_folder_nflTeams), existingObject);
+						const folderUpdateResult = await this.extendObjectAsync(replaceForbiddenCharactersInObjectID(IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS), existingObject);
 
 						if (folderUpdateResult) {
 							this.log.debug(`Successfully updated folder for NFL-Teams.`);
@@ -380,43 +837,80 @@ class Nfl extends utils.Adapter {
 			// CREATE: NFL-TEAM FOLDER
 			try {
 				const nflTeamLogoForNFLTeamFolder = NFLTeam.getNFLTeamLogoOfType(nflTeam, NFLTeamLogoTypes.Scoreboard_Logo);
-				const icon = nflTeamLogoForNFLTeamFolder?.base64Image ?? ""; // Provide an empty string as a default value
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug, nflTeam.displayName, "folder", undefined, undefined, undefined, undefined, icon, undefined, undefined, undefined, undefined, undefined);
+				const icon = (nflTeamLogoForNFLTeamFolder && (await this.ensureNFLTeamLogoBase64(nflTeamLogoForNFLTeamFolder))) || "";
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug, nflTeam.displayName, "folder", undefined, undefined, undefined, undefined, icon, undefined, undefined, undefined, undefined, undefined);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// CREATE: NFL-TEAM SUBFOLDER 'teamInfos'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos, ioBrokerObjectName_folder_nflTeam_teamInfos, "folder", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS, IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_INFOS, "folder", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'id'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_id, ioBrokerObjectName_state_nflTeam_id, "state", undefined, undefined, "number", "value", undefined, false, true, nflTeam.id, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ID, "state", undefined, undefined, "number", "value", undefined, false, true, nflTeam.id, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'uid'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_uid, ioBrokerObjectName_state_nflTeam_uid, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.uid, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__UID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__UID, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.uid, undefined, true);
+			} catch (error) {
+				throw new Error(error.message);
+			}
+
+			// STORE: NFL-TEAM 'slug'
+			try {
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SLUG, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SLUG, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.slug, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'abbreviation'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_abbreviation, ioBrokerObjectName_state_nflTeam_abbreviation, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.abbreviation, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ABBREVIATION,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ABBREVIATION,
+					"state",
+					undefined,
+					undefined,
+					"string",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.abbreviation,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'displayName'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_displayName, ioBrokerObjectName_state_nflTeam_displayName, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.displayName, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__DISPLAY_NAME,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__DISPLAY_NAME,
+					"state",
+					undefined,
+					undefined,
+					"string",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.displayName,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
@@ -425,8 +919,8 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_shortDisplayName,
-					ioBrokerObjectName_state_nflTeam_shortDisplayName,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SHORT_DISPLAY_NAME,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SHORT_DISPLAY_NAME,
 					"state",
 					undefined,
 					undefined,
@@ -445,21 +939,51 @@ class Nfl extends utils.Adapter {
 
 			// STORE: NFL-TEAM 'name'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_name, ioBrokerObjectName_state_nflTeam_name, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.name, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NAME, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NAME, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.name, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'nickname'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_nickname, ioBrokerObjectName_state_nflTeam_nickname, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.nickname, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NICKNAME,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NICKNAME,
+					"state",
+					undefined,
+					undefined,
+					"string",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.nickname,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'location'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_location, ioBrokerObjectName_state_nflTeam_location, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.location, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__LOCATION,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__LOCATION,
+					"state",
+					undefined,
+					undefined,
+					"string",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.location,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
@@ -468,8 +992,8 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamColors,
-					ioBrokerObjectName_folder_nflTeam_teamColors,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS,
+					IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_COLORS,
 					"folder",
 					undefined,
 					undefined,
@@ -490,8 +1014,8 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamColors + "." + ioBrokerObjectID_state_nflTeam_color,
-					ioBrokerObjectName_state_nflTeam_color,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__COLOR,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__COLOR,
 					"state",
 					undefined,
 					undefined,
@@ -512,8 +1036,8 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamColors + "." + ioBrokerObjectID_state_nflTeam_alternateColor,
-					ioBrokerObjectName_state_nflTeam_alternateColor,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ALTERNATE_COLOR,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ALTERNATE_COLOR,
 					"state",
 					undefined,
 					undefined,
@@ -532,21 +1056,66 @@ class Nfl extends utils.Adapter {
 
 			// STORE: NFL-TEAM 'isActive'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_isActive, ioBrokerObjectName_state_nflTeam_isActive, "state", undefined, undefined, "boolean", "value", undefined, false, true, nflTeam.isActive, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ACTIVE,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ACTIVE,
+					"state",
+					undefined,
+					undefined,
+					"boolean",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.isActive,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'isAllStar'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_state_nflTeam_isAllStar, ioBrokerObjectName_state_nflTeam_isAllStar, "state", undefined, undefined, "boolean", "value", undefined, false, true, nflTeam.isAllStar, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ALLSTAR,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ALLSTAR,
+					"state",
+					undefined,
+					undefined,
+					"boolean",
+					"value",
+					undefined,
+					false,
+					true,
+					nflTeam.isAllStar,
+					undefined,
+					true,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// CREATE: NFL-TEAM SUBFOLDER 'teamLogos'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos, ioBrokerObjectName_folder_nflTeam_teamLogos, "folder", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS,
+					IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGOS,
+					"folder",
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+				);
 			} catch (error) {
 				throw new Error(error.message);
 			}
@@ -556,32 +1125,34 @@ class Nfl extends utils.Adapter {
 				let ioBrokerObjectID_folder_nflTeam_teamLogo = null;
 				let ioBrokerObjectName_folder_nflTeam_teamLogo = null;
 				if (teamLogo.isDefaultLogo && teamLogo.isFullLogo && !teamLogo.isDarkLogo && !teamLogo.isScoreboardLogo) {
-					ioBrokerObjectID_folder_nflTeam_teamLogo = ioBrokerObjectID_folder_nflTeam_teamLogo_defaultLogo;
-					ioBrokerObjectName_folder_nflTeam_teamLogo = ioBrokerObjectName_folder_nflTeam_teamLogo_defaultLogo;
+					ioBrokerObjectID_folder_nflTeam_teamLogo = IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO;
+					ioBrokerObjectName_folder_nflTeam_teamLogo = IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO;
 				} else if (!teamLogo.isDefaultLogo && teamLogo.isFullLogo && teamLogo.isDarkLogo && !teamLogo.isScoreboardLogo) {
-					ioBrokerObjectID_folder_nflTeam_teamLogo = ioBrokerObjectID_folder_nflTeam_teamLogo_defaultLogoDark;
-					ioBrokerObjectName_folder_nflTeam_teamLogo = ioBrokerObjectName_folder_nflTeam_teamLogo_defaultLogoDark;
+					ioBrokerObjectID_folder_nflTeam_teamLogo = IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO_DARK;
+					ioBrokerObjectName_folder_nflTeam_teamLogo = IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO_DARK;
 				} else if (!teamLogo.isDefaultLogo && teamLogo.isFullLogo && !teamLogo.isDarkLogo && teamLogo.isScoreboardLogo) {
-					ioBrokerObjectID_folder_nflTeam_teamLogo = ioBrokerObjectID_folder_nflTeam_teamLogo_scoreboardLogo;
-					ioBrokerObjectName_folder_nflTeam_teamLogo = ioBrokerObjectName_folder_nflTeam_teamLogo_scoreboardLogo;
+					ioBrokerObjectID_folder_nflTeam_teamLogo = IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO;
+					ioBrokerObjectName_folder_nflTeam_teamLogo = IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO;
 				} else if (!teamLogo.isDefaultLogo && teamLogo.isFullLogo && teamLogo.isDarkLogo && teamLogo.isScoreboardLogo) {
-					ioBrokerObjectID_folder_nflTeam_teamLogo = ioBrokerObjectID_folder_nflTeam_teamLogo_scoreboardLogoDark;
-					ioBrokerObjectName_folder_nflTeam_teamLogo = ioBrokerObjectName_folder_nflTeam_teamLogo_scoreboardLogoDark;
+					ioBrokerObjectID_folder_nflTeam_teamLogo = IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO_DARK;
+					ioBrokerObjectName_folder_nflTeam_teamLogo = IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGO__SCOREBOARD_LOGO_DARK;
 				}
 
 				if (ioBrokerObjectID_folder_nflTeam_teamLogo != null && ioBrokerObjectName_folder_nflTeam_teamLogo != null) {
+					const teamLogoBase64 = (await this.ensureNFLTeamLogoBase64(teamLogo)) || "";
+
 					// CREATE: 'TEAM LOGOS' SUBFOLDER for LOGO-TYPE
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo,
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							"folder",
 							undefined,
 							undefined,
 							undefined,
 							undefined,
-							teamLogo.base64Image,
+							teamLogoBase64,
 							undefined,
 							undefined,
 							undefined,
@@ -596,8 +1167,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_url,
-							ioBrokerObjectName_state_nflTeam_teamLogo_url,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__URL,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__URL,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -618,8 +1189,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_alternativeURL,
-							ioBrokerObjectName_state_nflTeam_teamLogo_alternativeURL,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -640,8 +1211,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_width,
-							ioBrokerObjectName_state_nflTeam_teamLogo_width,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__WIDTH,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__WIDTH,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -662,8 +1233,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_height,
-							ioBrokerObjectName_state_nflTeam_teamLogo_height,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -684,8 +1255,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_isDefaultLogo,
-							ioBrokerObjectName_state_nflTeam_teamLogo_isDefaultLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -706,8 +1277,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_isFullLogo,
-							ioBrokerObjectName_state_nflTeam_teamLogo_isFullLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -728,8 +1299,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_isDarkLogo,
-							ioBrokerObjectName_state_nflTeam_teamLogo_isDarkLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -750,8 +1321,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_isScoreboardLogo,
-							ioBrokerObjectName_state_nflTeam_teamLogo_isScoreboardLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -768,12 +1339,12 @@ class Nfl extends utils.Adapter {
 						throw new Error(error.message);
 					}
 
-					// STORE: TEAM LOGO 'localCopyMetaStorageSubPath'
+					// STORE: TEAM LOGO 'localCopyMetaStorageSubpath'
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_localCopyMetaStorageSubPath,
-							ioBrokerObjectName_state_nflTeam_teamLogo_localCopyMetaStorageSubPath,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -794,8 +1365,8 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							ioBrokerObjectID_folder_nflTeams + "." + nflTeam.slug + "." + ioBrokerObjectID_folder_nflTeam_teamInfos + "." + ioBrokerObjectID_folder_nflTeam_teamLogos + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + ioBrokerObjectID_state_nflTeam_teamLogo_base64Image,
-							ioBrokerObjectName_state_nflTeam_teamLogo_base64Image,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							undefined,
@@ -804,7 +1375,7 @@ class Nfl extends utils.Adapter {
 							undefined,
 							false,
 							true,
-							teamLogo.base64Image,
+							teamLogoBase64,
 							undefined,
 							true,
 						);
@@ -812,6 +1383,400 @@ class Nfl extends utils.Adapter {
 						throw new Error(error.message);
 					}
 				}
+			}
+
+			if (nflTeam.nflDivision) {
+				// CREATE: NFL-TEAM SUBFOLDER 'teamDivision'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						"folder",
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - DIVISION 'id'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ID,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ID,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						undefined,
+						"number",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflDivision.id,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - DIVISION 'uid'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__UID,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__UID,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						undefined,
+						"string",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflDivision.uid,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - DIVISION 'slug'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						undefined,
+						"string",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflDivision.slug,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - DIVISION 'abbreviation'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						undefined,
+						"string",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflDivision.abbreviation,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - DIVISION 'name'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						undefined,
+						"string",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflDivision.name,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+			} else {
+				this.log.warn(`Skipping teamDivision object structure for NFL-Team '${nflTeam.displayName}': no division data available.`);
+			}
+
+			if (nflTeam.nflVenue) {
+				// CREATE: NFL-TEAM SUBFOLDER 'teamVenue'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
+						"folder",
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - VENUE 'id'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__ID,
+						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__ID,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
+						undefined,
+						"number",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflVenue.id,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: NFL-TEAM - VENUE 'fullName'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME,
+						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
+						undefined,
+						"string",
+						"value",
+						undefined,
+						false,
+						true,
+						nflTeam.nflVenue.fullName,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				if (nflTeam.nflVenue.venueAddress) {
+					// CREATE: 'TEAM VENUE' SUBFOLDER for VENUE ADDRESS
+					try {
+						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+							nflTeam,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							"folder",
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+							undefined,
+						);
+					} catch (error) {
+						throw new Error(error.message);
+					}
+
+					// STORE: TEAM VENUE 'city'
+					try {
+						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+							nflTeam,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY,
+							"state",
+							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							undefined,
+							"string",
+							"value",
+							undefined,
+							false,
+							true,
+							nflTeam.nflVenue.venueAddress.city,
+							undefined,
+							true,
+						);
+					} catch (error) {
+						throw new Error(error.message);
+					}
+
+					// STORE: TEAM VENUE 'state'
+					try {
+						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+							nflTeam,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE,
+							"state",
+							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							undefined,
+							"string",
+							"value",
+							undefined,
+							false,
+							true,
+							nflTeam.nflVenue.venueAddress.state,
+							undefined,
+							true,
+						);
+					} catch (error) {
+						throw new Error(error.message);
+					}
+
+					// STORE: TEAM VENUE 'zipCode'
+					try {
+						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+							nflTeam,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE,
+							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE,
+							"state",
+							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							undefined,
+							"string",
+							"value",
+							undefined,
+							false,
+							true,
+							nflTeam.nflVenue.venueAddress.zipCode,
+							undefined,
+							true,
+						);
+					} catch (error) {
+						throw new Error(error.message);
+					}
+
+				} else {
+					this.log.warn(`Skipping venueAddress object structure for NFL-Team '${nflTeam.displayName}': no venue address available.`);
+				}
+
+				// STORE: TEAM VENUE 'hasGrass'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS,
+						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
+						undefined,
+						"boolean",
+						"indicator",
+						undefined,
+						false,
+						true,
+						nflTeam.nflVenue.grass,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// STORE: TEAM VENUE 'isIndoor'
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR,
+						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR,
+						"state",
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
+						undefined,
+						"boolean",
+						"indicator",
+						undefined,
+						false,
+						true,
+						nflTeam.nflVenue.indoor,
+						undefined,
+						true,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				// CREATE: 'TEAM VENUE' SUBFOLDER for VENUE IMAGES
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						"folder",
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+
+				/*
+				let venueImageCounter = 1;
+				for (const venueImage of nflTeam.nflVenue.venueImages) {
+					// CREATE: 'TEAM VENUE IMAGES' SUBFOLDER for VENUE IMAGE
+				try {
+					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+						nflTeam,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						"folder",
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+						undefined,
+					);
+				} catch (error) {
+					throw new Error(error.message);
+				}
+				}
+				*/
+
+			} else {
+				this.log.warn(`Skipping teamVenue object structure for NFL-Team '${nflTeam.displayName}': no venue data available.`);
 			}
 
 			this.log.debug(`Successfully created objects and set states for NFL-Team '${nflTeam.displayName}'.`);
@@ -855,6 +1820,29 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**************************************************************************************************************************************
+	 * Ensures a team logo has a base64 data-URI, preferring the already downloaded adapter file to avoid a second HTTP fetch.
+	 **************************************************************************************************************************************/
+	async ensureNFLTeamLogoBase64(teamLogo) {
+		if (!(teamLogo instanceof NFLTeamLogo)) {
+			return null;
+		}
+
+		if (teamLogo.localCopyMetaStorageSubPath) {
+			const storePath = teamLogo.localCopyMetaStorageSubPath.replace(/\\/g, "/");
+			try {
+				const fileResult = await this.readFileAsync(this.namespace, storePath);
+				const localFileBuffer = fileResult && Object.prototype.hasOwnProperty.call(fileResult, "file") ? fileResult.file : fileResult;
+				const contentType = fileResult && fileResult.mimeType ? fileResult.mimeType : undefined;
+				return await teamLogo.ensureBase64Image({ localFileBuffer, contentType });
+			} catch (error) {
+				this.log.debug(`Could not read local logo file '${storePath}' for base64 conversion: ${error.message}. Falling back to URL fetch.`);
+			}
+		}
+
+		return await teamLogo.ensureBase64Image();
+	}
+
+	/**************************************************************************************************************************************
 	 * Creates or updates an object for a given NFL-Team in the specified namespace, and sets its state if applicable.
 	 *
 	 * @param {Object} nflTeam - The NFL team for which the object is being created or updated. Must have a `displayName` property.
@@ -874,13 +1862,15 @@ class Nfl extends utils.Adapter {
 	 *
 	 * @returns {Promise<void>} - Returns a promise that resolves when the object creation or update, and state setting (if applicable) is complete.
 	 * @throws {Error} - Throws an error if there is an issue with creating, updating, or setting the state of the object.
+	 *
+	 * @todo Completely recreate this documentation
 	 **************************************************************************************************************************************/
 	async createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, namespacePath, objectName, objectType, subCategory, objectDescription, commonType, role, icon, write, read, value, unit, acknowledge) {
 		// Validate subcategory
 		if (subCategory !== undefined && subCategory !== null && typeof subCategory !== "string" && subCategory !== "") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'subCategory' is invalid: '${subCategory}' (${typeof subCategory})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		subCategory = subCategory ? `for '${subCategory}' ` : "";
 
@@ -894,17 +1884,17 @@ class Nfl extends utils.Adapter {
 		if (!(nflTeam instanceof NFLTeam)) {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'nflTeam' is not an instance of 'NFLTeam'!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (namespacePath === undefined || namespacePath === null || typeof namespacePath !== "string" || namespacePath == "") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'namespacePath' is invalid: '${namespacePath}' (${typeof namespacePath})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectName === undefined || objectName === null || typeof objectName !== "string" || objectName == "") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'objectName' is invalid: '${objectName}' (${typeof objectName})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType.toString().toLowerCase() == "folder") {
 			objectType = "folder";
@@ -913,37 +1903,37 @@ class Nfl extends utils.Adapter {
 		} else {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'objectType' is invalid: '${objectType}' (${typeof objectType})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && objectDescription !== undefined && objectDescription !== null && typeof objectDescription !== "string") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'objectDescription' is invalid: '${objectDescription}' (${typeof objectDescription})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && commonType !== "number" && commonType !== "string" && commonType !== "boolean" && commonType !== "array" && commonType !== "object" && commonType !== "mixed" && commonType !== "file") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'commonType' is invalid: '${commonType}' (${typeof commonType})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && (role === undefined || role === null || typeof role !== "string" || role == "")) {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'role' is invalid: '${role}' (${typeof role})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && icon !== undefined && icon !== null && typeof icon !== "string") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'icon' is invalid: '${icon}' (${typeof icon})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && typeof write !== "boolean") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'write' is invalid: '${write}' (${typeof write})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && typeof read !== "boolean") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'read' is invalid: '${read}' (${typeof read})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && (value === undefined || value === null)) {
 			value = "";
@@ -951,12 +1941,12 @@ class Nfl extends utils.Adapter {
 		if (objectType === "state" && unit !== undefined && unit !== null && typeof unit !== "string") {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'unit' is invalid: '${unit}' (${typeof unit})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 		if (objectType === "state" && (acknowledge === undefined || acknowledge === null || typeof acknowledge !== "boolean")) {
 			const errorMessage = `Error while creating ${objectType} '${objectName}' ${subCategory}for NFL-Team '${nflTeam.displayName}': The received value for parameter 'acknowledge' is invalid: '${acknowledge}' (${typeof acknowledge})!`;
 			this.log.error(errorMessage);
-			throw new Error(errorMessage);
+			throw new TypeError(errorMessage);
 		}
 
 		try {
