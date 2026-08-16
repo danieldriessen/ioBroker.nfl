@@ -29,10 +29,10 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
 * **VIS-1 widget — NFL Scoreboard** (`tplNflScoreboard`): live/upcoming/all modes, favorite-filter, team logos (ESPN CDN), animated live indicator, dark-theme; auto-refreshes every 31 s
 * **VIS-1 widget — NFL Favorite Team** (`tplNflFavoriteTeam`): single-team card showing live score + clock, next game countdown, or last result
+* **VIS-1 widget — NFL Schedule** (`tplNflSchedule`): upcoming games from multi-week schedule (all or favorites); refreshes every 60 s
 
 ### Not implemented yet
 
-* VIS-1 multi-week schedule widget (schedule object tree is available for DIY)
 * VIS-2 widgets (optional future add-on)
 
 ## Requirements
@@ -89,6 +89,7 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) VIS-1 NFL Schedule widget (`tplNflSchedule`) + `views.schedule.upcoming` JSON
 * (Daniel Drießen) Daily team/logo/venue master-data refresh (admin interval; 0 = startup only)
 * (Daniel Drießen) Optional admin toggles for venue/broadcasts/attendance/sourcePath (prune when off)
 * (Daniel Drießen) Multi-week `schedule/` tree + richer game fields (venue/broadcasts) + view `sourcePath`

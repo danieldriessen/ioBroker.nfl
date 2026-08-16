@@ -12,6 +12,7 @@
 $.extend(true, systemDictionary, {
 	"nfl_instance":       { en: "Adapter instance",           de: "Adapter-Instanz" },
 	"nfl_mode":           { en: "Games to show",              de: "Angezeigte Spiele" },
+	"nfl_scheduleMode":   { en: "Schedule list",              de: "Spielplan-Liste" },
 	"nfl_favoriteOnly":   { en: "Favorite team only",         de: "Nur Lieblingsteam" },
 	"nfl_maxGames":       { en: "Max. games shown",           de: "Max. angezeigte Spiele" },
 	"nfl_showLogos":      { en: "Show team logos",            de: "Teamlogos anzeigen" },
@@ -497,6 +498,133 @@ vis.binds["nfl"] = {
 
 		if (self._timers[wid]) clearInterval(self._timers[wid]);
 		self._timers[wid] = setInterval(render, 31000);
+	},
+
+	/**
+	 * Maps a compact view-JSON game DTO into the shape expected by `_gameRow`.
+	 * @param {Object} dto
+	 * @returns {Object}
+	 */
+	_viewDtoToGame: function (dto) {
+		if (!dto) return null;
+		var home = dto.home || {};
+		var away = dto.away || {};
+		return {
+			id: dto.id,
+			name: dto.name,
+			shortName: dto.shortName,
+			date: dto.date,
+			week: dto.week,
+			seasonYear: dto.seasonYear,
+			status: {
+				state: dto.status || "pre",
+				displayClock: dto.clock || "",
+				period: dto.period || 0,
+				detail: dto.detail || "",
+				completed: !!dto.completed,
+			},
+			home: {
+				teamId: home.id || "",
+				abbreviation: home.abbr || "",
+				displayName: home.name || "",
+				score: home.score || "",
+				winner: !!home.winner,
+				isFavorite: !!home.isFavorite,
+			},
+			away: {
+				teamId: away.id || "",
+				abbreviation: away.abbr || "",
+				displayName: away.name || "",
+				score: away.score || "",
+				winner: !!away.winner,
+				isFavorite: !!away.isFavorite,
+			},
+		};
+	},
+
+	// ── Schedule widget ───────────────────────────────────────────────────────
+
+	/**
+	 * Multi-week upcoming schedule list (reads views.schedule.* JSON mirrors).
+	 * @param {string} wid
+	 * @param {string} view
+	 * @param {Object} data
+	 * @param {Object} style
+	 */
+	createSchedule: function (wid, view, data, style) {
+		var $div = $("#" + wid);
+		if (!$div.length) {
+			return setTimeout(function () {
+				vis.binds["nfl"].createSchedule(wid, view, data, style);
+			}, 100);
+		}
+
+		var self = vis.binds["nfl"];
+		var instance = (data.instance || "nfl.0").trim();
+		var mode = data.scheduleMode || "upcoming"; // upcoming | favorites
+		var maxGames = Math.max(1, parseInt(data.maxGames, 10) || 12);
+		var showLogos = !(data.showLogos === false || data.showLogos === "false");
+		var bg = data.bgColor || "#0d1117";
+		var fg = data.textColor || "#e6edf3";
+		var accent = data.accentColor || "#c8a94e";
+
+		var stateId =
+			mode === "favorites"
+				? instance + ".views.schedule.favoritesUpcoming"
+				: instance + ".views.schedule.upcoming";
+
+		var render = function () {
+			vis.conn.getStates([stateId, instance + ".views.schedule.upcomingCount"], function (err, states) {
+				var list = [];
+				try {
+					var raw = states && states[stateId] && states[stateId].val;
+					list = JSON.parse(raw || "[]");
+					if (!Array.isArray(list)) list = [];
+				} catch (e) {
+					list = [];
+				}
+				if (list.length > maxGames) list = list.slice(0, maxGames);
+
+				var games = [];
+				for (var i = 0; i < list.length; i++) {
+					var g = self._viewDtoToGame(list[i]);
+					if (g) games.push(g);
+				}
+
+				var h = '<div class="nfl-sb nfl-sch" style="background:' + bg + ';color:' + fg + '">';
+				h += '<div class="nfl-sb-hdr" style="border-bottom:1px solid ' + accent + '28">';
+				h += '<span class="nfl-sb-title" style="color:' + accent + '">';
+				h += mode === "favorites" ? "⭐ Upcoming Favorites" : "📅 NFL Schedule";
+				h += '</span>';
+				h += '<span class="nfl-dim" style="font-size:11px">' + games.length + " game" + (games.length === 1 ? "" : "s") + "</span>";
+				h += "</div>";
+
+				if (!games.length) {
+					h += '<div class="nfl-empty" style="color:' + fg + '88">';
+					if (mode === "favorites") {
+						h += "No upcoming favorite games.<br><small style=\"opacity:.55\">Set favorites in adapter admin, or wait for schedule refresh.</small>";
+					} else {
+						h += "No upcoming games.<br><small style=\"opacity:.55\">Enable schedule polling in adapter admin.</small>";
+					}
+					h += "</div>";
+				} else {
+					h += '<div class="nfl-sb-list">';
+					for (var j = 0; j < games.length; j++) {
+						h += self._gameRow(games[j], showLogos, bg, fg, accent);
+					}
+					h += "</div>";
+				}
+
+				h += "</div>";
+				$div.html(h);
+			});
+		};
+
+		render();
+
+		// Schedule changes slowly — refresh once a minute
+		if (self._timers[wid]) clearInterval(self._timers[wid]);
+		self._timers[wid] = setInterval(render, 60000);
 	},
 };
 

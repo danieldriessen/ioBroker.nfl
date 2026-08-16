@@ -1949,6 +1949,42 @@ class Nfl extends utils.Adapter {
 			);
 		}
 
+		// Schedule mirrors for VIS-1 schedule widget (always written — small JSON lists)
+		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.schedule`, {
+			type: "folder",
+			common: { name: "Schedule views" },
+			native: {},
+		});
+		const upcoming = universe
+			.filter((g) => g.status?.state === "pre")
+			.sort((a, b) => String(a.date).localeCompare(String(b.date)))
+			.slice(0, maxSlots);
+		const favUpcoming = favUniverse
+			.filter((g) => g.status?.state === "pre")
+			.sort((a, b) => String(a.date).localeCompare(String(b.date)))
+			.slice(0, maxSlots);
+		await this._setSimpleState(
+			`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.schedule.upcoming`,
+			"Upcoming games (JSON)",
+			"string",
+			"value.json",
+			JSON.stringify(upcoming.map((g) => this._gameToViewJson(g, g.path))),
+		);
+		await this._setSimpleState(
+			`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.schedule.upcomingCount`,
+			"Upcoming game count",
+			"number",
+			"value",
+			upcoming.length,
+		);
+		await this._setSimpleState(
+			`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.schedule.favoritesUpcoming`,
+			"Upcoming favorite games (JSON)",
+			"string",
+			"value.json",
+			JSON.stringify(favUpcoming.map((g) => this._gameToViewJson(g, g.path))),
+		);
+
 		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam`, {
 			type: "folder",
 			common: { name: "Per-team focus views" },
