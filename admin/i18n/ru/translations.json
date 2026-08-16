@@ -1,5 +1,9 @@
 {
-	"nfl adapter settings": "Настройки адаптера для nfl",
-	"option1": "Опция 1",
-	"option2": "вариант 2"
+	"nfl adapter settings": "Adapter settings for nfl",
+	"favorites_header": "Favorite teams",
+	"favoriteTeamIds": "Favorite teams",
+	"favoriteTeamIds_help": "Select one or more NFL teams to mark as favorites. The adapter writes an isFavorite flag on each team's object and on every game where that team plays.",
+	"scoreboard_header": "Scoreboard",
+	"pollIntervalLiveSeconds": "Live scoreboard refresh interval (seconds)",
+	"pollIntervalLiveSeconds_help": "How often to refresh the scoreboard while NFL games are in progress (15–300 s). When no game is live the adapter polls every 5 minutes automatically."
 }

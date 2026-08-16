@@ -11,7 +11,7 @@
 
 ## Description
 
-ioBroker adapter that fetches NFL team information (and, planned later, scores and live game updates) from public ESPN sports APIs and exposes it as ioBroker objects and files.
+ioBroker adapter that fetches NFL team information, live scores, and scoreboard data from public ESPN APIs and exposes them as ioBroker objects and files.
 
 ## Features
 
@@ -19,16 +19,15 @@ ioBroker adapter that fetches NFL team information (and, planned later, scores a
 
 * Load the NFL team list from ESPN
 * Download and store selected team logo variants in the adapter file store
-* Create an ioBroker object tree under `nfl-teams.*` (team info, colors, logos)
+* Create an ioBroker object tree under `nfl-teams.{espnTeamId}.*` (team info, colors, logos; slug is a state, not the folder key)
 * Enrich teams with division and venue data (including venue images) where available
+* Periodic scoreboard polling (ESPN CDN) writing `nfl-games.{eventId}.*` states: live scores, game clock, status, home/away teams
+* Configurable live refresh interval (admin, default 30 s; auto 5 min when no games are live)
+* Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
 
 ### Not implemented yet
 
-* Game schedules / scoreboards
-* Live scores and periodic refresh while games are in progress
-* Favorite team configuration
-* Production VIS-1 widgets (live / schedule / favorite — template stub only today)
-* Meaningful admin configuration (placeholder options only)
+* VIS-1 widget set (live score card, upcoming games, favorite-team focus — template stub only today)
 
 ## Requirements
 
@@ -39,7 +38,10 @@ ioBroker adapter that fetches NFL team information (and, planned later, scores a
 
 ## Configuration
 
-The admin UI still contains placeholder options from the adapter scaffold (`option1` / `option2`). They are not used by the adapter logic yet.
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| **Favorite teams** | _(none)_ | any | Multi-select dropdown of all 32 NFL teams. Adapter writes `isFavorite` on team objects and per-game home/away states. |
+| **Live scoreboard refresh interval (s)** | `30` | 15–300 | How often to poll the ESPN CDN scoreboard while games are in progress. Automatically slows to 5 min when no game is live. |
 
 ## Data source
 
@@ -58,7 +60,10 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
-* (Daniel Drießen) Team data, logos, division/venue enrichment (ongoing)
+* (Daniel Drießen) ESPN CDN scoreboard polling loop; `nfl-games.*` live score objects; adaptive 30s/5min intervals
+* (Daniel Drießen) Favorite-team admin multi-select; `isFavorite` states on team and game objects
+* (Daniel Drießen) Team folders keyed by ESPN team id; dynamic division season year
+* (Daniel Drießen) Team data, logos, division/venue enrichment
 * (Daniel Drießen) initial release
 
 ## License

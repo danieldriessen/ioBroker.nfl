@@ -63,6 +63,7 @@
 		"mode": "daemon",
 		"type": "misc-data",
 		"compact": true,
+		"messagebox": true,
 		"connectionType": "cloud",
 		"dataSource": "poll",
 		"adminUI": {
@@ -81,8 +82,8 @@
 		]
 	},
 	"native": {
-		"option1": true,
-		"option2": "42"
+		"favoriteTeamIds": [],
+		"pollIntervalLiveSeconds": 30
 	},
 	"objects": [],
 	"instanceObjects": [

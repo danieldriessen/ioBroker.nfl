@@ -58,6 +58,8 @@ const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ACTIVE = "isActive";
 const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ACTIVE = "Is active?";
 const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ALLSTAR = "isAllStar";
 const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ALLSTAR = "Is AllStar?";
+const IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_FAVORITE = "isFavorite";
+const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_FAVORITE = "Is favorite?";
 const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS = "teamLogos";
 const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGOS = "Team Logos";
 const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGO__DEFAULT_LOGO = "defaultLogo";
@@ -121,6 +123,16 @@ const IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR = "Is indoor"
 const IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES = "venueImages";
 const IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES = "Venue images";
 
+// NFL Games (scoreboard) object IDs
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES = "nfl-games";
+const IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO = "info";
+
+// Scoreboard poll settings
+const URL_ESPN_CDN_SCOREBOARD = "https://cdn.espn.com/core/nfl/scoreboard?xhr=1&limit=50";
+const SCOREBOARD_POLL_INTERVAL_IDLE_MS = 300_000; // 5 min when no live games
+const SCOREBOARD_POLL_INTERVAL_MIN_S = 15;
+const SCOREBOARD_POLL_INTERVAL_MAX_S = 300;
+
 // Define Paths
 const SUBPATH__NFL_TEAM_LOGO_IMAGES = "NFL-Team Logos";
 const SUBPATH__NFL_TEAM_LOGO_IMAGES__DEFAULT_LOGOS = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES, "Default Logos");
@@ -132,7 +144,12 @@ const SUBPATH__NFL_VENUE_IMAGES = "NFL-Venue Images";
 // Define URLs
 const URL_ESPN_API_BASIC_NFL_TEAM_DATA = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams";
 const URL_ESPN_API_ADDITIONAL_NFL_TEAM_DATA = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{TEAM-ID}";
-const URL_ESPN_API_NFL_DIVISION_DATA = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/2021/types/4/groups/{GROUP-ID}";
+const URL_ESPN_API_NFL_SEASONS = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons?limit=5";
+const URL_ESPN_API_NFL_SEASON = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/{YEAR}";
+// Division/group metadata lives under regular-season groups (type 2). Current calendar type
+// (pre/off) often has hasGroups=false — do not use the live season type for this URL.
+const URL_ESPN_API_NFL_DIVISION_DATA = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/{YEAR}/types/{SEASON_TYPE}/groups/{GROUP-ID}";
+const ESPN_NFL_SEASON_TYPE_REGULAR = 2;
 
 // Define Timeouts
 const TIMEOUT_URL_REQUESTS_PRIMARY = 10000;
@@ -149,13 +166,17 @@ class Nfl extends utils.Adapter {
 		this.on("ready", this.onReady.bind(this));
 		this.on("stateChange", this.onStateChange.bind(this));
 		// this.on("objectChange", this.onObjectChange.bind(this));
-		// this.on("message", this.onMessage.bind(this));
+		this.on("message", this.onMessage.bind(this));
 		this.on("unload", this.onUnload.bind(this));
 
 		// Define globale variables
 		this.nflDivisions = [];
 		this.nflTeams = [];
 		this.nflVenues = [];
+		/** @type {number|null} Cached ESPN season year used for division/group fetches */
+		this.nflDivisionSeasonYear = null;
+		/** @type {ReturnType<typeof setTimeout>|null} */
+		this._scoreboardTimer = null;
 	}
 
 	/**************************************************************************************************************************************
@@ -215,6 +236,9 @@ class Nfl extends utils.Adapter {
 
 		// Initialization completed successfully
 		await this.setStateAsync("info.connection", true, true);
+
+		// Start scoreboard polling loop
+		this._startScoreboardLoop();
 	}
 
 	/**************************************************************************************************************************************
@@ -284,13 +308,13 @@ class Nfl extends utils.Adapter {
 
 						// Set the desired 'local copy meta storage sub path' for the specific NFL-Team logo.
 						if (teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
-							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DEFAULT_LOGOS, team.slug + ".png");
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DEFAULT_LOGOS, String(team.id) + ".png");
 						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && !teamLogo.rel.includes("scoreboard")) {
-							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_DEFAULT_LOGOS, team.slug + ".png");
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_DEFAULT_LOGOS, String(team.id) + ".png");
 						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && !teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
-							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__SCOREBOARD_LOGOS, team.slug + ".png");
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__SCOREBOARD_LOGOS, String(team.id) + ".png");
 						} else if (!teamLogo.rel.includes("default") && teamLogo.rel.includes("full") && teamLogo.rel.includes("dark") && teamLogo.rel.includes("scoreboard")) {
-							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_SCOREBOARD_LOGOS, team.slug + ".png");
+							newTeamLogo.localCopyMetaStorageSubPath = path.join(SUBPATH__NFL_TEAM_LOGO_IMAGES__DARK_SCOREBOARD_LOGOS, String(team.id) + ".png");
 						}
 
 						teamLogos.push(newTeamLogo);
@@ -455,13 +479,17 @@ class Nfl extends utils.Adapter {
 			// Get the NFL-Team data part from the response date
 			const team = responseData.team;
 
-			// Check if we got the response for the correct NFL-Team
-			if (Number(team.id) !== nflTeam.id || team.slug !== nflTeam.slug) {
-				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Wrong information received!`;
+			// Identity is ESPN team id (stable). Slug is display metadata and may change.
+			if (Number(team.id) !== nflTeam.id) {
+				const errorMessage = `Error while getting additional data for NFL-Team '${nflTeam.displayName}': Wrong information received (id mismatch)!`;
 				this.log.error(errorMessage);
 				const warningMessage = `Warning: Skipping acquisition of additional data for NFL-Team '${nflTeam.displayName}'!`;
 				this.log.warn(warningMessage);
 				continue;
+			}
+			if (team.slug && team.slug !== nflTeam.slug) {
+				this.log.info(`NFL-Team id ${nflTeam.id} slug updated: '${nflTeam.slug}' → '${team.slug}'`);
+				nflTeam.slug = team.slug;
 			}
 
 			this.log.debug(`Successfully fetched additional data for NFL-Team '${nflTeam.displayName}'.`);
@@ -641,29 +669,264 @@ class Nfl extends utils.Adapter {
 		}
 	}
 
+	/* ====================================================== SCOREBOARD LOOP ========================================================= */
+
+	/**
+	 * Returns the configured favorite team IDs as a Set of strings.
+	 * @returns {Set<string>}
+	 */
+	_getFavoriteTeamIds() {
+		const raw = this.config.favoriteTeamIds;
+		const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+		return new Set(arr.map(String));
+	}
+
+	/**
+	 * Reads `pollIntervalLiveSeconds` from adapter config, clamps to allowed range, and returns ms.
+	 * @returns {number}
+	 */
+	_livePollIntervalMs() {
+		const raw = Number(this.config.pollIntervalLiveSeconds);
+		const clamped = Number.isFinite(raw)
+			? Math.min(SCOREBOARD_POLL_INTERVAL_MAX_S, Math.max(SCOREBOARD_POLL_INTERVAL_MIN_S, raw))
+			: 30;
+		if (clamped !== raw) {
+			this.log.warn(`pollIntervalLiveSeconds ${raw} out of range [${SCOREBOARD_POLL_INTERVAL_MIN_S}, ${SCOREBOARD_POLL_INTERVAL_MAX_S}]; using ${clamped}.`);
+		}
+		return clamped * 1000;
+	}
+
+	/**
+	 * Kicks off the first scoreboard fetch and schedules subsequent ones.
+	 * Uses a recursive setTimeout so polls never overlap.
+	 */
+	_startScoreboardLoop() {
+		const tick = async () => {
+			if (this._scoreboardTimer === null) {
+				return; // adapter was unloaded
+			}
+			let nextMs = SCOREBOARD_POLL_INTERVAL_IDLE_MS;
+			try {
+				const hasLive = await this.fetchAndStoreScoreboard();
+				nextMs = hasLive ? this._livePollIntervalMs() : SCOREBOARD_POLL_INTERVAL_IDLE_MS;
+			} catch (error) {
+				this.log.error(`Scoreboard poll failed: ${error.message}`);
+			}
+			if (this._scoreboardTimer !== null) {
+				this._scoreboardTimer = setTimeout(tick, nextMs);
+			}
+		};
+		this._scoreboardTimer = setTimeout(tick, 0);
+	}
+
+	/**
+	 * Fetches the ESPN CDN scoreboard, writes game objects under `nfl-games.*`.
+	 * @returns {Promise<boolean>} true if at least one game is currently live
+	 */
+	async fetchAndStoreScoreboard() {
+		this.log.debug(`Fetching NFL scoreboard from ESPN CDN...`);
+
+		const response = await axios.get(URL_ESPN_CDN_SCOREBOARD, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+		const sbData = response.data?.content?.sbData;
+
+		if (!sbData || !Array.isArray(sbData.events)) {
+			throw new Error(`Unexpected CDN scoreboard response shape`);
+		}
+
+		const events = sbData.events;
+		const seasonYear = sbData.season?.year ?? null;
+		const weekNumber = sbData.week?.number ?? null;
+		const favoriteTeamIds = this._getFavoriteTeamIds();
+
+		// Ensure nfl-games folder
+		await this.setObjectNotExistsAsync(IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES, {
+			type: "folder",
+			common: { name: "NFL Games" },
+			native: {},
+		});
+
+		// Write info channel
+		const infoPath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES__INFO}`;
+		await this.setObjectNotExistsAsync(infoPath, {
+			type: "channel",
+			common: { name: "Scoreboard info" },
+			native: {},
+		});
+
+		let liveCount = 0;
+		for (const ev of events) {
+			const comp = (ev.competitions || [])[0] || {};
+			const statusType = (comp.status || {}).type || {};
+			if (statusType.state === "in") {
+				liveCount++;
+			}
+		}
+
+		const now = new Date().toISOString();
+		await this._setSimpleState(`${infoPath}.lastUpdate`, "Last update", "string", "value", now);
+		await this._setSimpleState(`${infoPath}.liveGameCount`, "Live game count", "number", "value", liveCount);
+		await this._setSimpleState(`${infoPath}.eventCount`, "Event count", "number", "value", events.length);
+		await this._setSimpleState(`${infoPath}.seasonYear`, "Season year", "number", "value", seasonYear);
+		await this._setSimpleState(`${infoPath}.week`, "Week", "number", "value", weekNumber);
+
+		const nextPollS = liveCount > 0 ? this._livePollIntervalMs() / 1000 : SCOREBOARD_POLL_INTERVAL_IDLE_MS / 1000;
+		await this._setSimpleState(`${infoPath}.nextPollSeconds`, "Next poll in (s)", "number", "value", nextPollS);
+
+		// Write per-game objects
+		for (const ev of events) {
+			const eventId = ev.id;
+			if (!eventId) {
+				continue;
+			}
+			const eventPath = `${IOBROKER_OBJECT_ID__FOLDER__NFL_GAMES}.${eventId}`;
+
+			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(eventPath), {
+				type: "channel",
+				common: { name: ev.name || ev.shortName || eventId },
+				native: {},
+			});
+
+			await this._setSimpleState(`${eventPath}.name`, "Name", "string", "value", ev.name ?? "");
+			await this._setSimpleState(`${eventPath}.shortName`, "Short name", "string", "value", ev.shortName ?? "");
+			await this._setSimpleState(`${eventPath}.date`, "Kickoff (UTC)", "string", "value.time", ev.date ?? "");
+
+			const comp = (ev.competitions || [])[0] || {};
+			const statusObj = comp.status || {};
+			const statusType = statusObj.type || {};
+
+			const statusPath = `${eventPath}.status`;
+			await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(statusPath), {
+				type: "channel",
+				common: { name: "Status" },
+				native: {},
+			});
+			await this._setSimpleState(`${statusPath}.state`, "State", "string", "value", statusType.state ?? "");
+			await this._setSimpleState(`${statusPath}.name`, "Status name", "string", "value", statusType.name ?? "");
+			await this._setSimpleState(`${statusPath}.detail`, "Detail", "string", "value", statusType.detail ?? "");
+			await this._setSimpleState(`${statusPath}.shortDetail`, "Short detail", "string", "value", statusType.shortDetail ?? "");
+			await this._setSimpleState(`${statusPath}.period`, "Period", "number", "value", statusObj.period ?? 0);
+			await this._setSimpleState(`${statusPath}.displayClock`, "Clock", "string", "value", statusObj.displayClock ?? "");
+			await this._setSimpleState(`${statusPath}.completed`, "Completed", "boolean", "indicator", statusType.completed ?? false);
+
+			// Competitors
+			const competitors = comp.competitors || [];
+			for (const side of ["home", "away"]) {
+				const c = competitors.find((x) => x.homeAway === side) || {};
+				const team = c.team || {};
+				const sidePath = `${eventPath}.${side}`;
+				await this.setObjectNotExistsAsync(replaceForbiddenCharactersInObjectID(sidePath), {
+					type: "channel",
+					common: { name: side === "home" ? "Home team" : "Away team" },
+					native: {},
+				});
+				await this._setSimpleState(`${sidePath}.teamId`, "ESPN team ID", "string", "value", team.id ?? "");
+				await this._setSimpleState(`${sidePath}.abbreviation`, "Abbreviation", "string", "value", team.abbreviation ?? "");
+				await this._setSimpleState(`${sidePath}.displayName`, "Display name", "string", "value", team.displayName ?? "");
+				await this._setSimpleState(`${sidePath}.score`, "Score", "string", "value", c.score ?? "");
+				await this._setSimpleState(`${sidePath}.winner`, "Winner", "boolean", "indicator", c.winner ?? false);
+				await this._setSimpleState(`${sidePath}.isFavorite`, "Is favorite?", "boolean", "indicator", favoriteTeamIds.has(String(team.id ?? "")));
+			}
+		}
+
+		this.log.debug(`Scoreboard stored: ${events.length} events, ${liveCount} live.`);
+		return liveCount > 0;
+	}
+
+	/**
+	 * Creates (if not existing) and updates a simple state.
+	 * @param {string} idPath - Object id path (without adapter namespace)
+	 * @param {string} name - Human-readable name
+	 * @param {"string"|"number"|"boolean"} type
+	 * @param {string} role
+	 * @param {string|number|boolean|null} value
+	 */
+	async _setSimpleState(idPath, name, type, role, value) {
+		const id = replaceForbiddenCharactersInObjectID(idPath);
+		await this.setObjectNotExistsAsync(id, {
+			type: "state",
+			common: { name, type, role, read: true, write: false },
+			native: {},
+		});
+		await this.setStateAsync(id, { val: value, ack: true });
+	}
+
+	/* ====================================================== END SCOREBOARD LOOP =================================================== */
+
 	/**************************************************************************************************************************************
-	 * Fetches and processes data for a specific NFL-Division using its ID.
+	 * Resolves the ESPN NFL season year to use for division/group metadata.
+	 * Prefers a season whose start/end window contains "now"; falls back to the newest listed year.
+	 * Result is cached on the adapter instance for the process lifetime.
 	 *
-	 * This function performs the following steps:
-	 * 1. Validates the provided ID parameter to ensure it is a positive number.
-	 * 3. Constructs the URL for the API endpoint using the provided ID.
-	 * 4. Sends an HTTP GET request to the API endpoint to fetch the NFL-Division data.
-	 * 5. Validates the structure and content of the received JSON response.
-	 * 6. Creates an instance of the 'NFLDivision' class using the received data.
-	 * 7. Returns the created 'NFLDivision' instance.
+	 * @returns {Promise<number>}
+	 **************************************************************************************************************************************/
+	async resolveNFLDivisionSeasonYear() {
+		if (this.nflDivisionSeasonYear != null) {
+			return this.nflDivisionSeasonYear;
+		}
+
+		this.log.debug(`Resolving ESPN NFL season year for division/group fetches...`);
+
+		let seasonsResponseData = null;
+		try {
+			const response = await axios.get(URL_ESPN_API_NFL_SEASONS, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+			seasonsResponseData = response.data;
+		} catch (error) {
+			const errorMessage = `Error while fetching NFL seasons list for division data: ${error.message}`;
+			throw new Error(errorMessage);
+		}
+
+		if (!seasonsResponseData || typeof seasonsResponseData !== "object" || !Array.isArray(seasonsResponseData.items) || seasonsResponseData.items.length === 0) {
+			throw new Error(`Error while fetching NFL seasons list for division data: Invalid or empty response!`);
+		}
+
+		const seasonYears = [];
+		for (const item of seasonsResponseData.items) {
+			const ref = item && item.$ref;
+			if (typeof ref !== "string") {
+				continue;
+			}
+			const match = ref.match(/\/seasons\/(\d{4})(?:\?|$)/);
+			if (match) {
+				seasonYears.push(Number(match[1]));
+			}
+		}
+
+		if (seasonYears.length === 0) {
+			throw new Error(`Error while fetching NFL seasons list for division data: Could not parse any season years!`);
+		}
+
+		const nowMs = Date.now();
+		let resolvedYear = seasonYears[0];
+
+		for (const year of seasonYears) {
+			const seasonUrl = URL_ESPN_API_NFL_SEASON.replace("{YEAR}", String(year));
+			try {
+				const seasonResponse = await axios.get(seasonUrl, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
+				const seasonData = seasonResponse.data;
+				if (!seasonData || typeof seasonData !== "object") {
+					continue;
+				}
+				const startMs = seasonData.startDate ? Date.parse(seasonData.startDate) : NaN;
+				const endMs = seasonData.endDate ? Date.parse(seasonData.endDate) : NaN;
+				if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && nowMs >= startMs && nowMs <= endMs) {
+					resolvedYear = year;
+					break;
+				}
+			} catch (error) {
+				this.log.debug(`Could not inspect season ${year} while resolving division season year: ${error.message}`);
+			}
+		}
+
+		this.nflDivisionSeasonYear = resolvedYear;
+		this.log.debug(`Using ESPN NFL season year ${resolvedYear} (regular season type ${ESPN_NFL_SEASON_TYPE_REGULAR}) for division/group fetches.`);
+		return resolvedYear;
+	}
+
+	/**************************************************************************************************************************************
+	 * Fetches NFL-Division metadata for a group id via the core API (current season year, regular-season type).
 	 *
-	 * Throws an error if:
-	 * - The provided ID is not a positive number.
-	 * - The HTTP request fails.
-	 * - The received response is invalid or does not contain the expected structure.
-	 * - An error occurs while creating the 'NFLDivision' instance.
-	 *
-	 * @param {number} id - The ID of the NFL-Division to fetch data for.
-	 *
-	 * @returns {Promise<NFLDivision>} A promise that resolves to an 'NFLDivision' instance.
-	 *
-	 * @throws {TypeError} If the provided ID is not a positive number.
-	 * @throws {Error} If fetching or processing the NFL-Division data fails.
+	 * @param {number} id - The ESPN group/division ID.
+	 * @returns {Promise<NFLDivision>}
 	 **************************************************************************************************************************************/
 	async get_data_NFLDivision(id) {
 		this.log.debug(`Getting data for NFL-Division with ID '${id}'...`);
@@ -678,8 +941,10 @@ class Nfl extends utils.Adapter {
 			throw new TypeError(errorMessage);
 		}
 
+		const seasonYear = await this.resolveNFLDivisionSeasonYear();
+
 		// Get the content from the NFL-Division information URL
-		const url = URL_ESPN_API_NFL_DIVISION_DATA.replace("{GROUP-ID}", id.toString());
+		const url = URL_ESPN_API_NFL_DIVISION_DATA.replace("{YEAR}", String(seasonYear)).replace("{SEASON_TYPE}", String(ESPN_NFL_SEASON_TYPE_REGULAR)).replace("{GROUP-ID}", id.toString());
 		this.log.silly(`Fetching data for NFL-Division with ID '${id}' using URL: '${url}'...`);
 
 		const response = await axios.get(url, { timeout: TIMEOUT_URL_REQUESTS_PRIMARY });
@@ -831,42 +1096,45 @@ class Nfl extends utils.Adapter {
 		}
 
 		// Iterate NFL-Teams and create NFL-Team folder and all objects and states for every NFL-Team.
+		const favoriteTeamIds = this._getFavoriteTeamIds();
 		for (const nflTeam of nflTeams) {
 			this.log.debug(`Creating objects and setting states for NFL-Team '${nflTeam.displayName}'...`);
+			// Stable folder key: ESPN team id (not slug — slugs can rename).
+			const nflTeamObjectIdKey = getNFLTeamObjectIdKey(nflTeam);
 
 			// CREATE: NFL-TEAM FOLDER
 			try {
 				const nflTeamLogoForNFLTeamFolder = NFLTeam.getNFLTeamLogoOfType(nflTeam, NFLTeamLogoTypes.Scoreboard_Logo);
 				const icon = (nflTeamLogoForNFLTeamFolder && (await this.ensureNFLTeamLogoBase64(nflTeamLogoForNFLTeamFolder))) || "";
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug, nflTeam.displayName, "folder", undefined, undefined, undefined, undefined, icon, undefined, undefined, undefined, undefined, undefined);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey, nflTeam.displayName, "folder", undefined, undefined, undefined, undefined, icon, undefined, undefined, undefined, undefined, undefined);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// CREATE: NFL-TEAM SUBFOLDER 'teamInfos'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS, IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_INFOS, "folder", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS, IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_INFOS, "folder", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'id'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ID, "state", undefined, undefined, "number", "value", undefined, false, true, nflTeam.id, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ID, "state", undefined, undefined, "number", "value", undefined, false, true, nflTeam.id, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'uid'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__UID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__UID, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.uid, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__UID, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__UID, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.uid, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
 
 			// STORE: NFL-TEAM 'slug'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SLUG, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SLUG, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.slug, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SLUG, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SLUG, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.slug, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
@@ -875,7 +1143,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ABBREVIATION,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ABBREVIATION,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ABBREVIATION,
 					"state",
 					undefined,
@@ -897,7 +1165,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__DISPLAY_NAME,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__DISPLAY_NAME,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__DISPLAY_NAME,
 					"state",
 					undefined,
@@ -919,7 +1187,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SHORT_DISPLAY_NAME,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__SHORT_DISPLAY_NAME,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__SHORT_DISPLAY_NAME,
 					"state",
 					undefined,
@@ -939,7 +1207,7 @@ class Nfl extends utils.Adapter {
 
 			// STORE: NFL-TEAM 'name'
 			try {
-				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NAME, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NAME, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.name, undefined, true);
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(nflTeam, IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NAME, IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NAME, "state", undefined, undefined, "string", "value", undefined, false, true, nflTeam.name, undefined, true);
 			} catch (error) {
 				throw new Error(error.message);
 			}
@@ -948,7 +1216,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NICKNAME,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__NICKNAME,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__NICKNAME,
 					"state",
 					undefined,
@@ -970,7 +1238,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__LOCATION,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__LOCATION,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__LOCATION,
 					"state",
 					undefined,
@@ -992,7 +1260,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS,
 					IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_COLORS,
 					"folder",
 					undefined,
@@ -1014,7 +1282,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__COLOR,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__COLOR,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__COLOR,
 					"state",
 					undefined,
@@ -1036,7 +1304,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ALTERNATE_COLOR,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_COLORS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ALTERNATE_COLOR,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__ALTERNATE_COLOR,
 					"state",
 					undefined,
@@ -1058,7 +1326,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ACTIVE,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ACTIVE,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ACTIVE,
 					"state",
 					undefined,
@@ -1080,7 +1348,7 @@ class Nfl extends utils.Adapter {
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ALLSTAR,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_ALLSTAR,
 					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_ALLSTAR,
 					"state",
 					undefined,
@@ -1098,11 +1366,33 @@ class Nfl extends utils.Adapter {
 				throw new Error(error.message);
 			}
 
+			// STORE: NFL-TEAM 'isFavorite'
+			try {
+				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
+					nflTeam,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__IS_FAVORITE,
+					IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__IS_FAVORITE,
+					"state",
+					undefined,
+					undefined,
+					"boolean",
+					"indicator",
+					undefined,
+					false,
+					true,
+					favoriteTeamIds.has(String(nflTeam.id)),
+					undefined,
+					true,
+				);
+			} catch (error) {
+				throw new Error(error.message);
+			}
+
 			// CREATE: NFL-TEAM SUBFOLDER 'teamLogos'
 			try {
 				await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 					nflTeam,
-					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS,
+					IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS,
 					IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_LOGOS,
 					"folder",
 					undefined,
@@ -1145,7 +1435,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo,
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
 							"folder",
 							undefined,
@@ -1167,7 +1457,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__URL,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__URL,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__URL,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1189,7 +1479,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__ALTERNATIVE_URL,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1211,7 +1501,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__WIDTH,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__WIDTH,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__WIDTH,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1233,7 +1523,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__HEIGHT,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1255,7 +1545,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DEFAULT_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1277,7 +1567,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_FULL_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1299,7 +1589,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_DARK_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1321,7 +1611,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__IS_SCOREBOARD_LOGO,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1343,7 +1633,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__LOCAL_COPY_META_STORAGE_SUBPATH,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1365,7 +1655,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_LOGOS + "." + ioBrokerObjectID_folder_nflTeam_teamLogo + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_LOGO__BASE64_IMAGE,
 							"state",
 							ioBrokerObjectName_folder_nflTeam_teamLogo,
@@ -1390,7 +1680,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
 						"folder",
 						undefined,
@@ -1412,7 +1702,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ID,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ID,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ID,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
@@ -1434,7 +1724,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__UID,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__UID,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__UID,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
@@ -1456,7 +1746,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__SLUG,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
@@ -1478,7 +1768,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__ABBREVIATION,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
@@ -1500,7 +1790,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION__NAME,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_DIVISION,
@@ -1527,7 +1817,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
 						"folder",
 						undefined,
@@ -1549,7 +1839,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__ID,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__ID,
 						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__ID,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
@@ -1571,7 +1861,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME,
 						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__FULL_NAME,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
@@ -1594,7 +1884,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
 							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
 							"folder",
 							undefined,
@@ -1616,7 +1906,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__CITY,
 							"state",
 							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
@@ -1638,7 +1928,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__STATE,
 							"state",
 							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
@@ -1660,7 +1950,7 @@ class Nfl extends utils.Adapter {
 					try {
 						await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 							nflTeam,
-							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE,
+							IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE,
 							IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS__ZIP_CODE,
 							"state",
 							IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_ADDRESS,
@@ -1686,7 +1976,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS,
 						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__HAS_GRASS,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
@@ -1708,7 +1998,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR,
 						IOBROKER_OBJECT_NAME__STATE__NFL_TEAM__TEAM_VENUE__IS_INDOOR,
 						"state",
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE,
@@ -1730,7 +2020,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
 						"folder",
 						undefined,
@@ -1755,7 +2045,7 @@ class Nfl extends utils.Adapter {
 				try {
 					await this.createOrUpdateObjectAndSetState_for_NFLTeam(
 						nflTeam,
-						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeam.slug + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
+						IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS + "." + nflTeamObjectIdKey + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE + "." + IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
 						IOBROKER_OBJECT_NAME__FOLDER__NFL_TEAM__TEAM_VENUE__VENUE_IMAGES,
 						"folder",
 						undefined,
@@ -2060,12 +2350,10 @@ class Nfl extends utils.Adapter {
 	 */
 	onUnload(callback) {
 		try {
-			// Here you must clear all timeouts or intervals that may still be active
-			// clearTimeout(timeout1);
-			// clearTimeout(timeout2);
-			// ...
-			// clearInterval(interval1);
-
+			if (this._scoreboardTimer !== null) {
+				clearTimeout(this._scoreboardTimer);
+				this._scoreboardTimer = null;
+			}
 			callback();
 		} catch (e) {
 			callback();
@@ -2110,17 +2398,42 @@ class Nfl extends utils.Adapter {
 	//  * Using this method requires "common.messagebox" property to be set to true in io-package.json
 	//  * @param {ioBroker.Message} obj
 	//  */
-	// onMessage(obj) {
-	// 	if (typeof obj === "object" && obj.message) {
-	// 		if (obj.command === "send") {
-	// 			// e.g. send email or pushover or whatever
-	// 			this.log.info("send command");
+	/**
+	 * Handles messages sent to the adapter instance (used by admin sendTo controls).
+	 * @param {ioBroker.Message} obj
+	 */
+	onMessage(obj) {
+		if (typeof obj !== "object" || !obj) {
+			return;
+		}
+		if (obj.command === "getTeams") {
+			const teams = (this.nflTeams || [])
+				.slice()
+				.sort((a, b) => a.displayName.localeCompare(b.displayName))
+				.map((t) => ({
+					label: `${t.displayName} (${t.abbreviation})`,
+					value: String(t.id),
+				}));
+			if (obj.callback) {
+				this.sendTo(obj.from, obj.command, teams, obj.callback);
+			}
+		}
+	}
+}
 
-	// 			// Send response in callback if required
-	// 			if (obj.callback) this.sendTo(obj.from, obj.command, "Message received", obj.callback);
-	// 		}
-	// 	}
-	// }
+/**
+ * Stable ioBroker object-id segment for an NFL team folder.
+ * Uses ESPN numeric team id — never the mutable slug.
+ * @param {{id: number}|number|string} nflTeamOrId
+ * @returns {string}
+ */
+function getNFLTeamObjectIdKey(nflTeamOrId) {
+	const id = nflTeamOrId != null && typeof nflTeamOrId === "object" ? nflTeamOrId.id : nflTeamOrId;
+	const numericId = Number(id);
+	if (id === undefined || id === null || id === "" || Number.isNaN(numericId)) {
+		throw new TypeError(`Invalid NFL team id for object key: ${id}`);
+	}
+	return String(numericId);
 }
 
 function replaceForbiddenCharactersInObjectID(objectID) {
