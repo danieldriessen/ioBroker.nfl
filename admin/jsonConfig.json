@@ -163,6 +163,28 @@
 			"md": 6,
 			"lg": 4,
 			"xl": 4
+		},
+		"storage_header": {
+			"type": "header",
+			"text": "storage_header",
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
+		},
+		"writeLogoBase64": {
+			"type": "checkbox",
+			"label": "writeLogoBase64",
+			"help": "writeLogoBase64_help",
+			"default": false,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
 		}
 	}
 }

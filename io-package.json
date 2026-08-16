@@ -89,7 +89,8 @@
 		"currentPostGameLingerHours": 12,
 		"focusPostGameLingerHours": 24,
 		"viewsTodayMaxSlots": 16,
-		"writeViewJson": true
+		"writeViewJson": true,
+		"writeLogoBase64": false
 	},
 	"objects": [],
 	"instanceObjects": [

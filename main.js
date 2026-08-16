@@ -240,6 +240,13 @@ class Nfl extends utils.Adapter {
 			return;
 		}
 
+		// Drop logo/venue files that are no longer referenced (slug leftovers, renamed assets)
+		try {
+			await this._pruneOrphanImageFiles();
+		} catch (error) {
+			this.log.warn(`Image orphan cleanup failed: ${error.message}`);
+		}
+
 		// Initialization completed successfully
 		await this.setStateAsync("info.connection", true, true);
 
@@ -1337,17 +1344,54 @@ class Nfl extends utils.Adapter {
 
 		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.today`, "Today's games", todayGames, maxSlots);
 		await this._writeViewSlotFolder(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.live`, "Live games", liveGames, maxSlots);
-		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites`, {
-			type: "folder",
-			common: { name: "Favorite views" },
-			native: {},
-		});
-		await this._writeViewSlotFolder(
-			`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.today`,
-			"Favorite games today",
-			favToday,
-			maxSlots,
-		);
+
+		const favoritesPath = `${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites`;
+		if (favoriteTeamIds.size > 0) {
+			await this.setObjectNotExistsAsync(favoritesPath, {
+				type: "folder",
+				common: { name: "Favorite views" },
+				native: {},
+			});
+			await this._writeViewSlotFolder(`${favoritesPath}.today`, "Favorite games today", favToday, maxSlots);
+
+			if (this._writeViewJson()) {
+				await this._setSimpleState(
+					`${favoritesPath}.current`,
+					"Favorite games current slate (JSON)",
+					"string",
+					"value.json",
+					JSON.stringify(favCurrent.map((g) => this._gameToViewJson(g, g.path))),
+				);
+
+				const nextFav = favCurrent
+					.filter((g) => g.status.state === "pre")
+					.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+				const lastFav = favCurrent
+					.filter((g) => g.status.state === "post")
+					.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+				await this._setSimpleState(
+					`${favoritesPath}.next`,
+					"Next favorite game (JSON)",
+					"string",
+					"value.json",
+					JSON.stringify(nextFav ? this._gameToViewJson(nextFav, nextFav.path) : null),
+				);
+				await this._setSimpleState(
+					`${favoritesPath}.last`,
+					"Last favorite game (JSON)",
+					"string",
+					"value.json",
+					JSON.stringify(lastFav ? this._gameToViewJson(lastFav, lastFav.path) : null),
+				);
+			}
+		} else {
+			try {
+				await this.delObjectAsync(replaceForbiddenCharactersInObjectID(favoritesPath), { recursive: true });
+				this.log.debug(`Removed ${favoritesPath} (no favorite teams configured).`);
+			} catch (_e) {
+				// folder may not exist yet
+			}
+		}
 
 		if (this._writeViewJson()) {
 			await this._setSimpleState(
@@ -1364,34 +1408,6 @@ class Nfl extends utils.Adapter {
 				"value.json",
 				JSON.stringify(liveGames.map((g) => this._gameToViewJson(g, g.path))),
 			);
-			await this._setSimpleState(
-				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.current`,
-				"Favorite games current slate (JSON)",
-				"string",
-				"value.json",
-				JSON.stringify(favCurrent.map((g) => this._gameToViewJson(g, g.path))),
-			);
-
-			const nextFav = favCurrent
-				.filter((g) => g.status.state === "pre")
-				.sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
-			const lastFav = favCurrent
-				.filter((g) => g.status.state === "post")
-				.sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
-			await this._setSimpleState(
-				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.next`,
-				"Next favorite game (JSON)",
-				"string",
-				"value.json",
-				JSON.stringify(nextFav ? this._gameToViewJson(nextFav, nextFav.path) : null),
-			);
-			await this._setSimpleState(
-				`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.favorites.last`,
-				"Last favorite game (JSON)",
-				"string",
-				"value.json",
-				JSON.stringify(lastFav ? this._gameToViewJson(lastFav, lastFav.path) : null),
-			);
 		}
 
 		await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam`, {
@@ -1403,7 +1419,20 @@ class Nfl extends utils.Adapter {
 		const focusLingerMs = this._focusPostGameLingerHours() * 3600 * 1000;
 		const now = Date.now();
 
-		for (const teamId of favoriteTeamIds) {
+		/** @type {Map<string, string>} */
+		const teamNames = new Map();
+		for (const t of this.nflTeams || []) {
+			if (t && t.id != null) {
+				teamNames.set(String(t.id), t.displayName || t.abbreviation || String(t.id));
+			}
+		}
+		/** @type {Set<string>} */
+		const teamIds = new Set(teamNames.keys());
+		for (const id of favoriteTeamIds) {
+			teamIds.add(String(id));
+		}
+
+		for (const teamId of [...teamIds].sort((a, b) => Number(a) - Number(b))) {
 			const involving = sorted.filter((g) => g.home?.teamId === teamId || g.away?.teamId === teamId);
 			let chosen = null;
 			let phase = "idle";
@@ -1439,7 +1468,7 @@ class Nfl extends utils.Adapter {
 			const focusPath = `${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}.focus`;
 			await this.setObjectNotExistsAsync(`${IOBROKER_OBJECT_ID__FOLDER__VIEWS}.byTeam.${teamId}`, {
 				type: "folder",
-				common: { name: `Team ${teamId}` },
+				common: { name: teamNames.get(teamId) || `Team ${teamId}` },
 				native: {},
 			});
 			const dto = chosen ? { ...chosen, phase } : this._idleGameDto();
@@ -1449,7 +1478,8 @@ class Nfl extends utils.Adapter {
 	}
 
 	/**
-	 * Writes numbered flat view slots under a folder.
+	 * Writes numbered flat view slots under a folder — only for real games.
+	 * Does not create empty/idle placeholders. Removes leftover higher slots from prior polls.
 	 * @param {string} folderPath
 	 * @param {string} folderName
 	 * @param {object[]} games
@@ -1461,12 +1491,55 @@ class Nfl extends utils.Adapter {
 			common: { name: folderName },
 			native: {},
 		});
-		for (let i = 0; i < maxSlots; i++) {
-			const game = games[i] || this._idleGameDto();
+
+		const used = Math.min(games.length, maxSlots);
+		for (let i = 0; i < used; i++) {
+			const game = games[i];
 			const phase =
 				game.phase ||
-				(game.status?.state === "in" ? "live" : game.status?.state === "post" ? "final" : game.status?.state === "pre" ? "upcoming" : "idle");
+				(game.status?.state === "in"
+					? "live"
+					: game.status?.state === "post"
+						? "final"
+						: game.status?.state === "pre"
+							? "upcoming"
+							: "idle");
 			await this._writeGameChannel(`${folderPath}.${i}`, { ...game, phase }, { includePhase: true, phase });
+		}
+
+		await this._setSimpleState(`${folderPath}.count`, "Slot count", "number", "value", used);
+
+		// Drop slots that no longer have a game (e.g. live.0 after the game ended)
+		const folderPrefix = `${this.namespace}.${folderPath}.`;
+		/** @type {Set<number>} */
+		const existingSlots = new Set();
+		try {
+			const objects = await this.getAdapterObjectsAsync();
+			for (const fullId of Object.keys(objects || {})) {
+				if (!fullId.startsWith(folderPrefix)) {
+					continue;
+				}
+				const rest = fullId.slice(folderPrefix.length);
+				const slot = rest.split(".")[0];
+				if (/^\d+$/.test(slot)) {
+					existingSlots.add(Number(slot));
+				}
+			}
+		} catch (error) {
+			this.log.warn(`Could not list view slots under ${folderPath}: ${error.message}`);
+			return;
+		}
+
+		for (const slot of existingSlots) {
+			if (slot >= used) {
+				const rel = `${folderPath}.${slot}`;
+				try {
+					await this.delObjectAsync(replaceForbiddenCharactersInObjectID(rel), { recursive: true });
+					this.log.debug(`Removed empty view slot ${rel}`);
+				} catch (error) {
+					this.log.warn(`Failed to remove view slot ${rel}: ${error.message}`);
+				}
+			}
 		}
 	}
 
@@ -2067,7 +2140,8 @@ class Nfl extends utils.Adapter {
 				}
 
 				if (ioBrokerObjectID_folder_nflTeam_teamLogo != null && ioBrokerObjectName_folder_nflTeam_teamLogo != null) {
-					const teamLogoBase64 = (await this.ensureNFLTeamLogoBase64(teamLogo)) || "";
+					// Prefer file storage + CDN URLs for VIS; base64 in objects is opt-in (writeLogoBase64).
+					const teamLogoBase64 = this.config.writeLogoBase64 ? (await this.ensureNFLTeamLogoBase64(teamLogo)) || "" : "";
 
 					// CREATE: 'TEAM LOGOS' SUBFOLDER for LOGO-TYPE
 					try {
@@ -2080,7 +2154,7 @@ class Nfl extends utils.Adapter {
 							undefined,
 							undefined,
 							undefined,
-							teamLogoBase64,
+							teamLogoBase64 || undefined,
 							undefined,
 							undefined,
 							undefined,
@@ -2768,6 +2842,84 @@ class Nfl extends utils.Adapter {
 		}
 
 		return await teamLogo.ensureBase64Image();
+	}
+
+	/**
+	 * Deletes adapter files under logo/venue dirs that are not referenced by current in-memory teams/venues.
+	 */
+	async _pruneOrphanImageFiles() {
+		/** @type {Set<string>} */
+		const keep = new Set();
+		const norm = (p) => String(p || "").replace(/\\/g, "/").replace(/^\/+/, "");
+
+		for (const team of this.nflTeams || []) {
+			for (const logo of team.teamLogos || []) {
+				if (logo && logo.localCopyMetaStorageSubPath) {
+					keep.add(norm(logo.localCopyMetaStorageSubPath));
+				}
+			}
+		}
+		for (const venue of this.nflVenues || []) {
+			for (const img of venue.venueImages || []) {
+				if (img && img.localCopyMetaStorageSubPath) {
+					keep.add(norm(img.localCopyMetaStorageSubPath));
+				}
+			}
+		}
+
+		const roots = [SUBPATH__NFL_TEAM_LOGO_IMAGES, SUBPATH__NFL_VENUE_IMAGES];
+		let removed = 0;
+		for (const root of roots) {
+			removed += await this._pruneOrphanFilesUnder(norm(root), keep);
+		}
+		if (removed > 0) {
+			this.log.info(`Removed ${removed} orphan logo/venue file(s) from adapter storage.`);
+		}
+	}
+
+	/**
+	 * Recursively lists and deletes files under `dir` that are not in `keep`.
+	 * @param {string} dir
+	 * @param {Set<string>} keep
+	 * @returns {Promise<number>}
+	 */
+	async _pruneOrphanFilesUnder(dir, keep) {
+		let removed = 0;
+		/** @type {Array<{file: string, isDir: boolean}>} */
+		let entries = [];
+		try {
+			entries = (await this.readDirAsync(this.namespace, dir)) || [];
+		} catch (_e) {
+			return 0;
+		}
+		for (const entry of entries) {
+			const name = entry.file || entry.name;
+			if (!name || name === "." || name === "..") {
+				continue;
+			}
+			const full = dir ? `${dir}/${name}` : name;
+			if (entry.isDir) {
+				removed += await this._pruneOrphanFilesUnder(full, keep);
+				// try remove empty dir — ignore errors
+				try {
+					const left = (await this.readDirAsync(this.namespace, full)) || [];
+					if (!left.length) {
+						await this.unlinkAsync(this.namespace, full);
+					}
+				} catch (_e) {
+					// ignore
+				}
+			} else if (!keep.has(full)) {
+				try {
+					await this.unlinkAsync(this.namespace, full);
+					removed++;
+					this.log.debug(`Deleted orphan image file '${full}'`);
+				} catch (error) {
+					this.log.warn(`Could not delete orphan file '${full}': ${error.message}`);
+				}
+			}
+		}
+		return removed;
 	}
 
 	/**************************************************************************************************************************************

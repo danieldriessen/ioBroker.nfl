@@ -23,7 +23,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 * Enrich teams with division and venue data (including venue images) where available
 * Periodic scoreboard polling (ESPN CDN) writing `nfl-games.current.{eventId}.*` (live scores, clock, status, home/away)
 * Season archive under `nfl-games.archive/all|{favorites}/{seasonYear}/…` with configurable retention (N seasons or unlimited)
-* Stable DIY datapoints under `views.*` (flat slots + optional JSON mirrors; `views.byTeam.{id}.focus` for favorite cards)
+* Stable DIY datapoints under `views.*` (flat slots + optional JSON mirrors; `views.byTeam.{id}.focus` for every team; `views.favorites` only if favorites are configured)
 * Configurable live refresh interval (admin, default 30 s; auto 5 min when no games are live)
 * Favorite team selection in admin (multi-select); `isFavorite` flag on each team object and on home/away per game
 * **VIS-1 widget — NFL Scoreboard** (`tplNflScoreboard`): live/upcoming/all modes, favorite-filter, team logos (ESPN CDN), animated live indicator, dark-theme; auto-refreshes every 31 s
@@ -51,18 +51,20 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 | **Archive all / favorite games** | on / on | — | Store completed games under `archive/all` and/or `archive/favorites`. |
 | **Keep finished games in current (h)** | `12` | 0–168 | Linger in `nfl-games.current` after leaving the slate before archive. |
 | **Favorite focus: show final (h)** | `24` | 0–168 | How long `views.byTeam.{id}.focus` stays on `final` before next upcoming. |
-| **Max today/live view slots** | `16` | 1–32 | Flat slots `views.today.N` / `views.live.N` for DIY VIS bindings. |
+| **Max today/live view slots** | `16` | 1–32 | Cap for numbered slots. Slots exist only while games fill them (no empty placeholders). |
 | **Also write JSON view mirrors** | on | — | Extra JSON states for scripts; flat states are always written. |
+| **Store logo base64 in objects** | off | — | Off recommended; logos remain files + CDN URLs for VIS. |
 
 ### Object paths for DIY VIS
 
 Prefer stable views (paths do not move when a game is archived):
 
-* `nfl.0.views.byTeam.{espnTeamId}.focus.*` — upcoming / live / final for one team  
+* `nfl.0.views.byTeam.{espnTeamId}.focus.*` — upcoming / live / final for **every** team (stable path)  
 * `nfl.0.views.today.0` … — today's games as numbered slots  
 * `nfl.0.views.live.0` … — live games only  
+* `nfl.0.views.favorites.*` — only present when at least one favorite team is set  
 
-Canonical week data: `nfl.0.nfl-games.current.{eventId}.*` (IDs change each week).
+Canonical week data: `nfl.0.nfl-games.current.{eventId}.*` (IDs change each week). Prefer `views.*` for DIY bindings.
 
 ## Data source
 

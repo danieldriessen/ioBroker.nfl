@@ -19,7 +19,10 @@
 	"focusPostGameLingerHours": "Favoriten-Focus: Endergebnis anzeigen (Stunden)",
 	"focusPostGameLingerHours_help": "Wie lange views.byTeam.{id}.focus das Endergebnis zeigt, bevor zum nächsten Upcoming gewechselt wird.",
 	"viewsTodayMaxSlots": "Max. Spiele in today/live-Slots",
-	"viewsTodayMaxSlots_help": "Anzahl flacher Slots unter views.today.N und views.live.N (1–32). Diese in VIS für eigene Boards binden.",
+	"viewsTodayMaxSlots_help": "Maximale Anzahl nummerierter Slots unter views.today / views.live / views.favorites.today (1–32). Slots entstehen nur, solange dort Spiele liegen — leere Platzhalter werden nicht behalten.",
 	"writeViewJson": "Auch JSON-View-Spiegel schreiben",
-	"writeViewJson_help": "Schreibt zusätzlich JSON-Strings (z. B. views.today.scoreboard) für Scripts und eigene JS-Widgets. Flache States werden immer geschrieben."
+	"writeViewJson_help": "Schreibt zusätzlich JSON-Strings (z. B. views.today.scoreboard) für Scripts und eigene JS-Widgets. Flache States werden immer geschrieben.",
+	"storage_header": "Bildspeicher",
+	"writeLogoBase64": "Logo-Base64 in Objekten speichern",
+	"writeLogoBase64_help": "Standardmäßig aus (empfohlen). Logos bleiben als Dateien im Adapter-Namespace; VIS-Widgets nutzen ESPN-CDN-URLs. Nur aktivieren, wenn du Base64/Icons im Objektbaum brauchst."
 }
