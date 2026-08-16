@@ -5,22 +5,40 @@
 		"favorites_header": {
 			"type": "header",
 			"text": "favorites_header",
-			"newLine": true
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
 		},
 		"favoriteTeamIds": {
-			"type": "sendTo",
+			"type": "selectSendTo",
 			"command": "getTeams",
 			"label": "favoriteTeamIds",
 			"help": "favoriteTeamIds_help",
 			"multiple": true,
-			"showAsList": true,
+			"showAllValues": true,
+			"noTranslation": true,
+			"manual": false,
 			"newLine": true,
-			"default": []
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
 		},
 		"scoreboard_header": {
 			"type": "header",
 			"text": "scoreboard_header",
-			"newLine": true
+			"size": 2,
+			"newLine": true,
+			"xs": 12,
+			"sm": 12,
+			"md": 12,
+			"lg": 12,
+			"xl": 12
 		},
 		"pollIntervalLiveSeconds": {
 			"type": "number",
@@ -29,7 +47,12 @@
 			"newLine": true,
 			"default": 30,
 			"min": 15,
-			"max": 300
+			"max": 300,
+			"xs": 12,
+			"sm": 12,
+			"md": 6,
+			"lg": 4,
+			"xl": 4
 		}
 	}
 }

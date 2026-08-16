@@ -2454,7 +2454,75 @@ class Nfl extends utils.Adapter {
 	//  * @param {ioBroker.Message} obj
 	//  */
 	/**
-	 * Handles messages sent to the adapter instance (used by admin sendTo controls).
+	 * Builds the favorite-team options for admin `selectSendTo`.
+	 * Prefers in-memory `this.nflTeams` (current after init);
+	 * falls back to team displayName/abbreviation states if memory is empty.
+	 * Rebuilt on every admin request so the dropdown stays fresh.
+	 * @returns {Promise<Array<{label: string, value: string}>>}
+	 */
+	async _getTeamsForAdmin() {
+		if (Array.isArray(this.nflTeams) && this.nflTeams.length) {
+			return this.nflTeams
+				.slice()
+				.sort((a, b) => a.displayName.localeCompare(b.displayName))
+				.map((t) => ({
+					label: `${t.displayName} (${t.abbreviation})`,
+					value: String(t.id),
+				}));
+		}
+
+		const displayNamePattern =
+			`${IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS}.*.${IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS}.${IOBROKER_OBJECT_ID__STATE__NFL_TEAM__DISPLAY_NAME}`;
+		const abbreviationPattern =
+			`${IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS}.*.${IOBROKER_OBJECT_ID__FOLDER__NFL_TEAM__TEAM_INFOS}.${IOBROKER_OBJECT_ID__STATE__NFL_TEAM__ABBREVIATION}`;
+
+		const [displayNames, abbreviations] = await Promise.all([
+			this.getStatesAsync(displayNamePattern),
+			this.getStatesAsync(abbreviationPattern),
+		]);
+
+		/** @type {Map<string, {id: string, displayName: string, abbreviation: string}>} */
+		const byId = new Map();
+		const teamIdFromFullId = (fullId) => {
+			const match = String(fullId).match(new RegExp(`\\.${IOBROKER_OBJECT_ID__FOLDER__NFL_TEAMS}\\.(\\d+)\\.`));
+			return match ? match[1] : null;
+		};
+
+		for (const [fullId, st] of Object.entries(displayNames || {})) {
+			const teamId = teamIdFromFullId(fullId);
+			if (!teamId) {
+				continue;
+			}
+			if (!byId.has(teamId)) {
+				byId.set(teamId, { id: teamId, displayName: "", abbreviation: "" });
+			}
+			if (st && st.val != null && st.val !== "") {
+				byId.get(teamId).displayName = String(st.val);
+			}
+		}
+		for (const [fullId, st] of Object.entries(abbreviations || {})) {
+			const teamId = teamIdFromFullId(fullId);
+			if (!teamId) {
+				continue;
+			}
+			if (!byId.has(teamId)) {
+				byId.set(teamId, { id: teamId, displayName: "", abbreviation: "" });
+			}
+			if (st && st.val != null && st.val !== "") {
+				byId.get(teamId).abbreviation = String(st.val);
+			}
+		}
+
+		return [...byId.values()]
+			.map((t) => ({
+				label: t.abbreviation ? `${t.displayName || t.id} (${t.abbreviation})` : t.displayName || t.id,
+				value: t.id,
+			}))
+			.sort((a, b) => a.label.localeCompare(b.label));
+	}
+
+	/**
+	 * Handles messages sent to the adapter instance (used by admin selectSendTo / sendTo).
 	 * @param {ioBroker.Message} obj
 	 */
 	onMessage(obj) {
@@ -2462,16 +2530,20 @@ class Nfl extends utils.Adapter {
 			return;
 		}
 		if (obj.command === "getTeams") {
-			const teams = (this.nflTeams || [])
-				.slice()
-				.sort((a, b) => a.displayName.localeCompare(b.displayName))
-				.map((t) => ({
-					label: `${t.displayName} (${t.abbreviation})`,
-					value: String(t.id),
-				}));
-			if (obj.callback) {
-				this.sendTo(obj.from, obj.command, teams, obj.callback);
-			}
+			// Always answer so admin UI does not hang; options are rebuilt on every open/request.
+			this._getTeamsForAdmin()
+				.then((teams) => {
+					this.log.debug(`getTeams: returning ${teams.length} team option(s) to admin`);
+					if (obj.callback) {
+						this.sendTo(obj.from, obj.command, teams, obj.callback);
+					}
+				})
+				.catch((error) => {
+					this.log.error(`getTeams failed: ${error.message}`);
+					if (obj.callback) {
+						this.sendTo(obj.from, obj.command, [], obj.callback);
+					}
+				});
 		}
 	}
 }

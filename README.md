@@ -43,7 +43,7 @@ ioBroker adapter that fetches NFL team information, live scores, and scoreboard 
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| **Favorite teams** | _(none)_ | any | Multi-select dropdown of all 32 NFL teams. Adapter writes `isFavorite` on team objects and per-game home/away states. |
+| **Favorite teams** | _(none)_ | any | Dropdown loads the current team list from the running adapter each time you open it (`selectSendTo` / `getTeams`). Select favorites, then use **Save** in the admin toolbar. Writes `isFavorite` on team objects and per-game home/away states. |
 | **Live scoreboard refresh interval (s)** | `30` | 15–300 | How often to poll the ESPN CDN scoreboard while games are in progress. Automatically slows to 5 min when no game is live. |
 
 ## Data source
@@ -63,6 +63,7 @@ If there are any concerns regarding the use of copyrighted materials in this ada
 -->
 
 ### **WORK IN PROGRESS**
+* (Daniel Drießen) Fix favorite-team admin control: use `selectSendTo` (fresh team list on open; standard Save/Close toolbar)
 * (Daniel Drießen) VIS-1 widgets: NFL Scoreboard and Favorite Team card
 * (Daniel Drießen) ESPN CDN scoreboard polling loop; `nfl-games.*` live score objects; adaptive 30s/5min intervals
 * (Daniel Drießen) Favorite-team admin multi-select; `isFavorite` states on team and game objects

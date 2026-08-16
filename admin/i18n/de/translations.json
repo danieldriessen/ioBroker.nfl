@@ -2,7 +2,7 @@
 	"nfl adapter settings": "Adaptereinstellungen für nfl",
 	"favorites_header": "Lieblingsteams",
 	"favoriteTeamIds": "Lieblingsteams",
-	"favoriteTeamIds_help": "Wähle ein oder mehrere NFL-Teams als Favorit aus. Der Adapter setzt eine isFavorite-Markierung am Team-Objekt und an jedem Spiel, in dem das Team antritt.",
+	"favoriteTeamIds_help": "Öffne die Auswahlliste, um die aktuelle Team-Liste vom laufenden Adapter zu laden. Wähle einen oder mehrere Favoriten und speichere mit Speichern in der Admin-Leiste. Der Adapter setzt isFavorite am Team-Objekt und an jedem Spiel, in dem das Team antritt.",
 	"scoreboard_header": "Ergebnisanzeige",
 	"pollIntervalLiveSeconds": "Live-Aktualisierungsintervall (Sekunden)",
 	"pollIntervalLiveSeconds_help": "Wie oft das Scoreboard während laufender Spiele aktualisiert wird (15–300 s). Wenn kein Spiel läuft, fragt der Adapter automatisch alle 5 Minuten ab."
