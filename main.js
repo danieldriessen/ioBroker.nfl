@@ -771,6 +771,8 @@ class Nfl extends utils.Adapter {
 
 		const nextPollS = liveCount > 0 ? this._livePollIntervalMs() / 1000 : SCOREBOARD_POLL_INTERVAL_IDLE_MS / 1000;
 		await this._setSimpleState(`${infoPath}.nextPollSeconds`, "Next poll in (s)", "number", "value", nextPollS);
+		const eventIdList = events.map((e) => e.id).filter(Boolean);
+		await this._setSimpleState(`${infoPath}.eventIds`, "Event IDs (JSON)", "string", "value.json", JSON.stringify(eventIdList));
 
 		// Write per-game objects
 		for (const ev of events) {

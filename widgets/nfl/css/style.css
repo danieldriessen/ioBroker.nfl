@@ -1,4 +1,290 @@
-/* Style your widget here */
-.nfl-class {
+/*
+	ioBroker.vis nfl Widget-Set — Styles
+	Copyright 2024-2026 Daniel Drießen daniel.driessen@ddproductions.de
+*/
+
+/* ── Shared base ────────────────────────────────────────────────────────────── */
+
+.nfl-sb,
+.nfl-ft {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+	border-radius: 8px;
+	overflow: hidden;
+	height: 100%;
+	width: 100%;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	font-size: 13px;
+	line-height: 1.4;
+	-webkit-font-smoothing: antialiased;
+}
+
+.nfl-dim {
+	font-weight: 400;
+	opacity: 0.65;
+}
+
+.nfl-empty {
+	padding: 20px 16px;
+	text-align: center;
+	line-height: 1.6;
+}
+
+/* ── Live badge (header) ────────────────────────────────────────────────────── */
+
+.nfl-live-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 9px 2px 6px;
+	border-radius: 12px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.07em;
+	flex-shrink: 0;
+}
+
+/* Animated pulsing dot (used in badge) */
+.nfl-dot-anim {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.65);
+	animation: nfl-pulse 1.4s ease-in-out infinite;
+	flex-shrink: 0;
+}
+
+/* Red dot for live game row status line */
+.nfl-dot-red {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #ff5555;
+	animation: nfl-pulse 1.4s ease-in-out infinite;
+	flex-shrink: 0;
+}
+
+@keyframes nfl-pulse {
+	0%,
+	100% { opacity: 1; }
+	50%   { opacity: 0.3; }
+}
+
+/* ── NFL Scoreboard widget ──────────────────────────────────────────────────── */
+
+.nfl-sb-hdr {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 14px;
+	flex-shrink: 0;
+}
+
+.nfl-sb-title {
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.nfl-sb-list {
+	overflow-y: auto;
+	flex: 1;
+}
+
+/* One game row */
+.nfl-row {
+	padding: 8px 14px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	transition: background 0.15s;
+}
+
+.nfl-row:last-child {
+	border-bottom: none;
+}
+
+/* Status line (FINAL / Q2 5:32 / date) */
+.nfl-row-status {
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	margin-bottom: 5px;
+	min-height: 14px;
+}
+
+.nfl-live-line {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+
+/* Teams + score row */
+.nfl-row-teams {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.nfl-team {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+}
+
+.nfl-team-r {
+	flex-direction: row-reverse;
+}
+
+.nfl-logo {
+	width: 32px;
+	height: 32px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+.nfl-abbr {
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+}
+
+/* Score block (centered between teams) */
+.nfl-score-blk {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 72px;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.nfl-score {
+	font-size: 18px;
+	font-weight: 700;
+	min-width: 22px;
+	text-align: center;
+	line-height: 1;
+}
+
+/* Winner gets a subtle glow */
+.nfl-win {
+	text-shadow: 0 0 10px currentColor;
+}
+
+.nfl-sep {
+	font-size: 13px;
+}
+
+.nfl-vs {
+	font-size: 12px;
 	font-style: italic;
+}
+
+/* ── NFL Favorite Team widget ───────────────────────────────────────────────── */
+
+.nfl-ft-hdr {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 16px;
+	font-size: 13px;
+	flex-shrink: 0;
+}
+
+.nfl-ft-body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 14px 16px 18px;
+	gap: 10px;
+	flex: 1;
+}
+
+/* My team logo */
+.nfl-ft-logo-wrap {
+	margin: 4px 0 6px;
+}
+
+.nfl-ft-logo {
+	width: 80px;
+	height: 80px;
+	object-fit: contain;
+	display: block;
+}
+
+/* Small label above scores ("FINAL" / "NEXT GAME" etc.) */
+.nfl-ft-label {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+/* Period / clock line when live */
+.nfl-ft-clock {
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+}
+
+/* Score block */
+.nfl-ft-scores {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+.nfl-ft-side {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+}
+
+.nfl-ft-abbr {
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+}
+
+.nfl-ft-big {
+	font-size: 40px;
+	font-weight: 800;
+	line-height: 1;
+}
+
+.nfl-ft-dash {
+	font-size: 26px;
+	font-weight: 200;
+	line-height: 1;
+	margin-top: 16px; /* align with number baseline */
+}
+
+/* Opponent line */
+.nfl-ft-opp {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+}
+
+.nfl-ft-opp-logo {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+/* Upcoming date */
+.nfl-ft-date {
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
 }

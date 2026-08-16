@@ -3,133 +3,58 @@
 
 	version: "0.0.1"
 
-	Copyright 2024 Daniel Drießen daniel.driessen@ddproductions.de
+	Copyright 2024-2026 Daniel Drießen daniel.driessen@ddproductions.de
 -->
-<!-- here you can include so many css as you want -->
 <link rel="stylesheet" href="widgets/nfl/css/style.css" />
-<!-- here you can include so many js-files as you want -->
 <script type="text/javascript" src="widgets/nfl/js/nfl.js"></script>
 
-<!-- the full description of format in data-vis-attrs can be found here:
-	https://github.com/ioBroker/ioBroker.vis/blob/master/www/js/visEditInspect.js#L39
-
-	----------------------------------------------------------
-	Mandatory XML attributes:
-		id="tplNflWIDGETNAME"
-		type="text/ejs"
-		class="vis-tpl"
-
-		"type" and "class" are always the same. "id" is unique and must start with "tplSETNAME" and ends with widget name. Use camel-case for it.
-
-	----------------------------------------------------------
-	data-vis-attrs - divided with semicolon the list of attributes, like attr1/id;attr2/color
-		Full format of one attribute is: attr_name(start-end)[default_value]/type,idFilter/onChangeFunc
-			attr_name - the name of the attribute, e.g. "myID"
-			start-end - creates automatically attributes from attr_namestart to attr_nameend, like "myID(1-3)" creates myID1, myID2, myID3
-			default_value - by creation of widget this attribute will be filled with this value, e.g. "myID[#001122]/color"
-			type - some predefined types have edit helpers, else it will be shown as text field
-
-				Type format:
-					  id - Object ID Dialog
-					  checkbox
-					  image - image
-					  number,min,max,step - non-float number. min,max,step are optional
-					  color - color picker
-					  views - Name of the view
-					  effect - jquery UI show/hide effects
-					  eff_opt - additional option to effect slide (up, down, left, right)
-					  fontName - Font name
-					  slider,min,max,step - Default step is ((max - min) / 100)
-					  select,value1,value2,... - dropdown select
-					  nselect,value1,value2,... - same as select, but without translation of items
-					  style,fileFilter,nameFilter,attrFilter
-					  custom,functionName,options,... - custom editor - functionName is starting from vis.binds.[widgetset.funct]. E.g. custom/timeAndWeather.editWeather,short
-					  group.name - define new or old group. All following attributes belongs to new group till new group.xyz
-					  group.name/byindex - like group, but all following attributes will be grouped by ID. Like group.windows/byindex;slide(1-4)/id;slide_type(1-4)/select,open,closed  Following groups will be created Windows1(slide1,slide_type1), Windows2(slide2,slide_type2), Windows3(slide3,slide_type3), Windows4(slide4,slide_type4)
-					  text - dialog box with html editor
-					  html - dialog box with html editor
-
-				If type is "id", you can define filer for "Select ID Dialog", like "myID/id,level.temperature".
-				Additionally you can define callback(onChangeFunc), which will be called if this attribute was changed by user for different purposes: validate entry, fill other attributes, ...
-
-		You can define additional data-vis-attrs line: data-vis-attrs0, data-vis-attrs1. Anyway data-vis-attrs must be there. You may not skip numbers.
-		E.g. in "data-vis-attrs="A;" data-vis-attrs1="B" attribute B will be not parsed.
-
-	--------------------------------------------------------
-	data-vis-type
-		Help information for user. Used for search.
-		You can define more than one type divided by comma.
-		There are following common types, but you can use your own specific types:
-			ctrl   - widget that can write some Object IDs
-			val    - widget that shows some information from Object IDs
-			static - widget do not read information from Object IDs or URL
-			button - button widget
-			dimmer - dimmer widget
-			weather - weather widget
-			...
-
-	--------------------------------------------------------
-	data-vis-set
-		Name of the widget set. Must be equal to the name of this HTML file
-
-	--------------------------------------------------------
-	data-vis-prev
-		Html code used as preview of this widget. If widget is complex you can just use image as preview:
-		data-vis-prev='<img src="widgets/hqwidgets/img/prev/Prev_tplNflShowInstance.png"></img>'
-		Of course the image must exist.
-
-	--------------------------------------------------------
-	data-vis-name
-		Readable name of widget shown in vis editor.
-
-	--------------------------------------------------------
-	data-vis-beta="true"
-		Shows "BETA" symbol in vis editor by preview
-
-	--------------------------------------------------------
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     WIDGET 1 — NFL Scoreboard
+     Shows live, upcoming, or all NFL games with scores, clocks, and logos.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<script id="tplNflScoreboard"
+	type="text/ejs"
+	class="vis-tpl"
+	data-vis-set="nfl"
+	data-vis-type="val"
+	data-vis-name="NFL Scoreboard"
 	data-vis-update-style="true"
-		Call redraw of widget if some of the CSS styles in editor for this widget was changed
-
-	You can read about Magic tags here: http://canjs.com/guides/EJS.html
-	Following magic tags are exist:
-		<% %> - execute javascript
-		<%= %> - place escaped result to HTML document
-		<%== %> - place unescaped result to HTML document
-
-	You can do "if" conditions and "for" cycles.
-
--->
-<script id="tplNflShowInstance"
-		type="text/ejs"
-		class="vis-tpl"
-		data-vis-prev='<div id="prev_tplNflShowInstance" style="position: relative; text-align: initial;padding: 4px "><div class="vis-widget_prev " style="width: 280px; height: 159px;" > <div class="nfl-class vis-widget-prev-body " style="padding:2px"> OID: hm-rpc.0.EEQ0006629.1.STATE<br> OID value: true<br> Color: <span style="color: rgb(128, 0, 0);">#800000</span><br> htmlText: <textarea readonly="" style="width:100%">asda</textarea></div>'
-		data-vis-attrs="oid/id;myColor/color;htmlText/text;"
-		data-vis-attrs0="group.extraNfl;extraAttr"
-		data-vis-set="nfl"
-		data-vis-type="helper"
-		data-vis-name="Show instance">
-	<div class="vis-widget <%== this.data.attr('class') %>" style="width:230px; height:210px;" id="<%= this.data.attr('wid') %>" >
-		<div class="nfl-class vis-widget-body <%== this.data.attr('class') %>" style="padding:2px" >
-			OID: <%= this.data.attr('oid') %><br>
-			OID value: <%== vis.states.attr(this.data['oid'] + '.val') %><br>
-			Color: <span style="color: <%= this.data.attr('myColor') %>"><%= this.data.attr('myColor') %></span><br>
-			extraAttr: <%== this.data.attr('extraAttr') %><br>
-			Browser instance: <%= vis.instance %><br>
-			htmlText: <textarea readonly style="width: calc(100% - 10px)"><%== this.data.attr('htmlText') %></textarea><br>
-		</div>
-	</div>
+	data-vis-prev='<div style="background:#0d1117;border-radius:8px;padding:0;font-family:sans-serif;width:270px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #c8a94e28"><span style="color:#c8a94e;font-weight:700;font-size:13px;letter-spacing:.05em">🏈 NFL &nbsp;<span style="font-weight:400;font-size:11px;opacity:.65">Week 2  2026</span></span><span style="background:#c8a94e;color:#000;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,.6);display:inline-block"></span>2 LIVE</span></div><div style="padding:8px 14px;background:#161b22;border-bottom:1px solid #ffffff0a"><div style="color:#ff5555;font-size:10px;font-weight:600;letter-spacing:.05em;margin-bottom:5px">● Q2&nbsp;&nbsp;5:32</div><div style="display:flex;align-items:center;gap:8px;color:#e6edf3"><span style="font-size:13px;font-weight:700">PHI</span><div style="flex:1;display:flex;justify-content:center;gap:6px;align-items:center"><span style="font-size:18px;font-weight:700;color:#c8a94e">0</span><span style="color:#e6edf322">–</span><span style="font-size:18px;font-weight:700;color:#c8a94e">7</span></div><span style="font-size:13px;font-weight:700">BAL</span></div></div><div style="padding:8px 14px;border-bottom:1px solid #ffffff0a"><div style="color:#e6edf377;font-size:10px;margin-bottom:5px">Sun, Sep 8&nbsp;&nbsp;4:25 PM</div><div style="display:flex;align-items:center;gap:8px;color:#e6edf3"><span style="font-size:13px;font-weight:700">KC</span><div style="flex:1;display:flex;justify-content:center"><span style="font-size:13px;color:#e6edf344;font-style:italic">vs</span></div><span style="font-size:13px;font-weight:700">CLE</span></div></div></div>'
+	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_filter;mode[all]/nselect,all,live,upcoming;favoriteOnly/checkbox;maxGames[16]/number,1,50,1;group.nfl_group_style;showLogos[true]/checkbox;bgColor[#0d1117]/color;textColor[#e6edf3]/color;accentColor[#c8a94e]/color">
+	<div class="vis-widget"
+		id="<%= this.data.attr('wid') %>"
+		style="width:100%;height:100%;overflow:hidden;box-sizing:border-box"><%
+		vis.binds['nfl'].createScoreboard(
+			this.data.wid,
+			this.view,
+			this.data,
+			this.style
+		);
+	%></div>
 </script>
 
-<script id="tplNflHelper"
-		type="text/ejs"
-		class="vis-tpl"
-		data-vis-prev='<div id="prev_tplNflHelper" style="position: relative; text-align: initial;padding: 4px "><div class="vis-widget_prev " style="width: 280px; height: 159px;" > <div class="nfl-class vis-widget-prev-body " style="padding:2px"> OID: hm-rpc.0.EEQ0006629.1.STATE<br> OID value: true<br> Color: <span style="color: rgb(128, 0, 0);">#800000</span><br> htmlText: <textarea readonly="" style="width:100%">asda</textarea></div>'
-		data-vis-attrs="oid/id;myColor/color;htmlText/text;"
-		data-vis-attrs0="group.extraNfl;extraAttr"
-		data-vis-set="nfl"
-		data-vis-type="helper"
-		data-vis-name="Helper">
-	<div class="vis-widget <%== this.data.attr('class') %>" style="overflow:visible; width: 230px; height: 210px" id="<%= this.data.attr('wid') %>"><%
-		vis.binds['nfl'].createWidget(this.data.wid, this.view, this.data, this.style);
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     WIDGET 2 — NFL Favorite Team
+     Shows a single focused card for the configured favorite team:
+     live score (if playing), next game (if upcoming), or last result.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<script id="tplNflFavoriteTeam"
+	type="text/ejs"
+	class="vis-tpl"
+	data-vis-set="nfl"
+	data-vis-type="val"
+	data-vis-name="NFL Favorite Team"
+	data-vis-update-style="true"
+	data-vis-prev='<div style="background:#0d1117;border-radius:8px;padding:0;font-family:sans-serif;width:200px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid #c8a94e28"><span style="color:#c8a94e;font-weight:700;font-size:13px">⭐ Pittsburgh Steelers</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:16px;gap:8px;color:#e6edf3"><img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/scoreboard/pit.png&amp;w=80&amp;h=80&amp;scale=crop" style="width:72px;height:72px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:#e6edf355;text-transform:uppercase;margin-top:4px">NEXT GAME</div><div style="font-size:13px;font-weight:600;color:#c8a94e">Sun, Sep 8&nbsp;&nbsp;1:00 PM</div><div style="font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px"><img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/scoreboard/cle.png&amp;w=28&amp;h=28&amp;scale=crop" style="width:24px;height:24px;object-fit:contain" onerror="this.style.display=\'none\'">vs Cleveland Browns</div></div></div>'
+	data-vis-attrs="group.nfl_group_data;instance[nfl.0]/text;group.nfl_group_style;showLogos[true]/checkbox;bgColor[#0d1117]/color;textColor[#e6edf3]/color;accentColor[#c8a94e]/color">
+	<div class="vis-widget"
+		id="<%= this.data.attr('wid') %>"
+		style="width:100%;height:100%;overflow:hidden;box-sizing:border-box"><%
+		vis.binds['nfl'].createFavoriteTeam(
+			this.data.wid,
+			this.view,
+			this.data,
+			this.style
+		);
 	%></div>
 </script>
